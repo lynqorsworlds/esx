@@ -7781,27 +7781,27 @@ for name, id in pairs(Animations) do
 end
 
 Messages = {
-    SteelHub = {
-        "SteelHub vibes! Dominate with style!",
-        "Unleash chaos with SteelHub power!",
-        "Top-tier gameplay? SteelHub way!",
-        "Crush it with SteelHub magic!",
-        "SteelHub hype! Rule the game!",
-        "Stay ahead with SteelHub elite!",
-        "Game just got better! SteelHub zone!",
-        "SteelHub flow! Outplay everyone!",
-        "Be a legend with SteelHub rise!",
-        "Own the game with SteelHub energy!",
-        "SteelHub squad! Lead the pack!",
-        "Pros choose SteelHub glory!",
-        "Level up your game! SteelHub fire!",
-        "SteelHub rush! Make every moment count!",
-        "Master the game with SteelHub skill!",
-        "No one stops SteelHub!",
-        "Game’s finest? That’s SteelHub!",
-        "SteelHub spark! Ignite your run!",
-        "Play smarter with SteelHub edge!",
-        "Domination starts with SteelHub!"
+    LQNHUB = {
+        "LQN HUB vibes! Dominate with style!",
+        "Unleash chaos with LQN HUB power!",
+        "Top-tier gameplay? LQN HUB way!",
+        "Crush it with LQN HUB magic!",
+        "LQN HUB hype! Rule the game!",
+        "Stay ahead with LQN HUB elite!",
+        "Game just got better! LQN HUB zone!",
+        "LQN HUB flow! Outplay everyone!",
+        "Be a legend with LQN HUB rise!",
+        "Own the game with LQN HUB energy!",
+        "LQN HUB squad! Lead the pack!",
+        "Pros choose LQN HUB glory!",
+        "Level up your game! LQN HUB fire!",
+        "LQN HUB rush! Make every moment count!",
+        "Master the game with LQN HUB skill!",
+        "No one stops LQN HUB!",
+        "Game’s finest? That’s LQN HUB!",
+        "LQN HUB spark! Ignite your run!",
+        "Play smarter with LQN HUB edge!",
+        "Domination starts with LQN HUB!"
     },
     Russian = {
         "Я в игре, и это уже победа!",
@@ -8295,7 +8295,7 @@ Messages = {
 }
 
 IsSpamming = false
-SelectedMode = "SteelHub"
+SelectedMode = "LQNHUB"
 TrashTalkLanguage = "English"
 LastMessageTime = 0
 Cooldown = 2.6
@@ -8309,7 +8309,7 @@ MiscRight4:AddToggle('SpamToggle', {
 })
 
 MiscRight4:AddDropdown('ModeDropdown', {
-    Values = { 'SteelHub', 'Russian', 'English', 'TrashTalk' },
+    Values = { 'LQNHUB', 'Russian', 'English', 'TrashTalk' },
     Default = 1,
     Text = 'Message Type',
     Callback = function(Value)
