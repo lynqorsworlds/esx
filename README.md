@@ -83,17 +83,17 @@ remote2 = game:GetService("ReplicatedStorage").Events["XMHH2.2"]
 MainLeft = Tabs.Main:AddLeftGroupbox('Main')
 
 CodersButton = MainLeft:AddButton({
-    Text = "Coders",
+    Text = "How to hide GUI",
     Func = function()
-        warn("Coders script: family_aks, thx hubstudioinjection for fling, esp and thx imbetter1_1 for free key system, infinite stamina, long fly and more scripts!!")
+        game:GetService("StarterGui"):SetCore("SendNotification",{Title="Enter",Text="RightShift",Duration=5})
     end
 })
 
 DiscordButton = MainLeft:AddButton({
     Text = "Discord",
     Func = function()
-        warn("https://discord.gg/REG77bCwJh")
-        setclipboard("https://discord.gg/REG77bCwJh")
+        warn("https://discord.gg/dqExASwhRB")
+        setclipboard("https://discord.gg/dqExASwhRB")
     end
 })
 
