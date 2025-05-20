@@ -1396,38 +1396,6 @@ CombatLeft4:AddToggle('NoRecoil', {
     end
 })
 
-CombatLeft4:AddToggle('EquipAnimSpeed', {
-    Text = 'Equip Anim Speed',
-    Default = false,
-    Tooltip = 'Adjusts weapon equip animation speed',
-    Callback = function(Value)
-        if Value and #weaponTables == 0 then
-            for _, v in pairs(getgc(true)) do
-                if type(v) == 'table' and rawget(v, 'EquipTime') then
-                    weaponTables[#weaponTables + 1] = v
-                end
-            end
-        end
-        GunModules()
-    end
-})
-
-CombatLeft4:AddToggle('AimAnimSpeed', {
-    Text = 'Aim Anim Speed',
-    Default = false,
-    Tooltip = 'Adjusts aiming animation speed',
-    Callback = function(Value)
-        if Value and #weaponTables == 0 then
-            for _, v in pairs(getgc(true)) do
-                if type(v) == 'table' and rawget(v, 'EquipTime') then
-                    weaponTables[#weaponTables + 1] = v
-                end
-            end
-        end
-        GunModules()
-    end
-})
-
 BulletTracer = CombatLeft4:AddToggle('BulletTracerToggle', {
     Text = 'Bullet Tracer',
     Default = false,
@@ -1441,32 +1409,6 @@ BulletTracer:AddColorPicker('BulletColorPicker', {
     Title = 'BulletTracer Color',
     Callback = function(Value)
         Settings.Color = Value
-    end
-})
-
-CombatLeft4:AddSlider('EquipTimeAmount', {
-    Text = 'Equip Speed Amount',
-    Default = 0,
-    Min = 0,
-    Max = 5,
-    Rounding = 1,
-    Callback = function(Value)
-        if Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value then
-            GunModules()
-        end
-    end
-})
-
-CombatLeft4:AddSlider('AimSpeedAmount', {
-    Text = 'Aim Speed Amount',
-    Default = 0,
-    Min = 0,
-    Max = 5,
-    Rounding = 1,
-    Callback = function(Value)
-        if Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value then
-            GunModules()
-        end
     end
 })
 
