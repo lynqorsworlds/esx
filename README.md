@@ -1426,24 +1426,54 @@ GunModules = function()
                     AngleZ_Max = v.AngleZ_Max or 0,
                     Spread = v.Spread or 0,
                     EquipTime = v.EquipTime or 0.5,
-                    AimSpeed = (v.AimSettings and v.AimSettings.AimSpeed) or 1,
+                    AimSpeed = (v.AimSettings and v.AimSettings.AimSpeed) or (v.SniperSettings and v.SniperSettings.AimSpeed) or 1,
                     ChargeTime = v.ChargeTime or 0,
                     SlowDown = v.SlowDown or 0,
                     FireModeSettings = type(v.FireModeSettings) == 'table' and table.clone(v.FireModeSettings) or v.FireModeSettings
                 }
             end
-            v.Recoil = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].Recoil
-            v.AngleX_Min = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].AngleX_Min
-            v.AngleX_Max = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].AngleX_Max
-            v.AngleY_Min = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].AngleY_Min
-            v.AngleY_Max = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].AngleY_Max
-            v.AngleZ_Min = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].AngleZ_Min
-            v.AngleZ_Max = (Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value) and 0 or originalValues[v].AngleZ_Max
-            v.Spread = (Toggles and Toggles.Spread and Toggles.Spread.Value) and 0 or originalValues[v].Spread
-            v.EquipTime = (Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value) and safeGet(Options, {"EquipTimeAmount", "Value"}, 0) or originalValues[v].EquipTime
-            if v.AimSettings and v.SniperSettings then
-                v.AimSettings.AimSpeed = (Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value) and safeGet(Options, {"AimSpeedAmount", "Value"}, 0) or originalValues[v].AimSpeed
-                v.SniperSettings.AimSpeed = (Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value) and safeGet(Options, {"AimSpeedAmount", "Value"}, 0) or originalValues[v].AimSpeed
+            if Options and Options.RecoilControl then
+                recoilMultiplier = Options.RecoilControl.Value
+                v.Recoil = originalValues[v].Recoil * recoilMultiplier
+                v.AngleX_Min = originalValues[v].AngleX_Min * recoilMultiplier
+                v.AngleX_Max = originalValues[v].AngleX_Max * recoilMultiplier
+                v.AngleY_Min = originalValues[v].AngleY_Min * recoilMultiplier
+                v.AngleY_Max = originalValues[v].AngleY_Max * recoilMultiplier
+                v.AngleZ_Min = originalValues[v].AngleZ_Min * recoilMultiplier
+                v.AngleZ_Max = originalValues[v].AngleZ_Max * recoilMultiplier
+            else
+                v.Recoil = originalValues[v].Recoil
+                v.AngleX_Min = originalValues[v].AngleX_Min
+                v.AngleX_Max = originalValues[v].AngleX_Max
+                v.AngleY_Min = originalValues[v].AngleY_Min
+                v.AngleY_Max = originalValues[v].AngleY_Max
+                v.AngleZ_Min = originalValues[v].AngleZ_Min
+                v.AngleZ_Max = originalValues[v].AngleZ_Max
+            end
+            if Toggles and Toggles.Spread and Toggles.Spread.Value then
+                v.Spread = 0
+            else
+                v.Spread = originalValues[v].Spread
+            end
+            if Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value and Options and Options.EquipTimeAmount then
+                v.EquipTime = Options.EquipTimeAmount.Value
+            else
+                v.EquipTime = originalValues[v].EquipTime
+            end
+            if Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value and Options and Options.AimSpeedAmount then
+                if v.AimSettings then
+                    v.AimSettings.AimSpeed = Options.AimSpeedAmount.Value
+                end
+                if v.SniperSettings then
+                    v.SniperSettings.AimSpeed = Options.AimSpeedAmount.Value
+                end
+            else
+                if v.AimSettings and originalValues[v].AimSpeed then
+                    v.AimSettings.AimSpeed = originalValues[v].AimSpeed
+                end
+                if v.SniperSettings and originalValues[v].AimSpeed then
+                    v.SniperSettings.AimSpeed = originalValues[v].AimSpeed
+                end
             end
         end
     end
