@@ -1,4 +1,4 @@
-local repo = 'https://raw.githubusercontent.com/csuserbro/NeverloseLib/main/'
+local repo = 'https://raw.githubusercontent.com/yourmakerqkeso/EverloseLib/main/'
 
 Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
@@ -10603,4 +10603,4 @@ ThemeManager:ApplyToTab(Tabs.Settings)
 
 SaveManager:LoadAutoloadConfig()
 
-Library:Notify("Join in discord - discord.gg/REG77bCwJh", 20)
+Library:Notify("Join in discord - discord.gg/jWv4vzY86T", 20)
