@@ -5,7 +5,7 @@ ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 Window = Library:CreateWindow({
-    Title = "corup.cc",
+    Title = "LQN.CC",
     Center = true,
     AutoShow = true,
     TabPadding = 4,
