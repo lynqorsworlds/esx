@@ -787,7 +787,7 @@ CombatLeft2:AddToggle('SilentAimToggle', {
             remotes.SilentAimTask = task.spawn(function()
                 while functions.silentaimF do
                     currentTarget = UrTargetFunc()
-                    game:GetService("RunService").Heartbeat:Wait()
+                    task.wait(0.1)
                 end
             end)
             visualizeConnection = VisualizeEvent.Event:Connect(function(_, ShotCode, _, Gun, _, StartPos, BulletsPerShot)
