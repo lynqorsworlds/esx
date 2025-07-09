@@ -599,98 +599,180 @@ CombatRight:AddSlider('SmoothSizeSlider', {
     end
 })
 
-function GetClosestTarget()
-    Closest = nil
-    ClosestDist = SectionSettings.AimBot.DrawSize
-    for _, Player in pairs(game.Players:GetPlayers()) do
-        if Player ~= game.Players.LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
-            Pos, OnScreen = game.Workspace.CurrentCamera:WorldToViewportPoint(Player.Character.HumanoidRootPart.Position)
-            if OnScreen then
-                if SectionSettings.AimBot.CheckTeam and Player.Team == game.Players.LocalPlayer.Team then
-                    continue
-                end
-                if SectionSettings.AimBot.CheckWhitelist and GlobalWhiteList[Player.Name] then
-                    continue
-                end
-                if SectionSettings.AimBot.CheckWall then
-                    Ignore = {game.Workspace.CurrentCamera, game.Players.LocalPlayer.Character, Player.Character}
-                    if Player.Parent ~= game.Workspace then
-                        table.insert(Ignore, Player.Parent)
-                    end
-                    CheckPart = Player.Character:FindFirstChild("HumanoidRootPart")
-                    if not CheckPart then return nil end
-                    Value = #game.Workspace.CurrentCamera:GetPartsObscuringTarget({CheckPart.Position}, Ignore)
-                    if Value > 0 then
-                        continue
-                    end
-                end
-                Distance = (Vector2.new(Pos.X, Pos.Y) - Vector2.new(game.UserInputService:GetMouseLocation().X, game.UserInputService:GetMouseLocation().Y)).Magnitude
-                if Distance < ClosestDist then
-                    ClosestDist = Distance
-                    Closest = Player
-                end
+local WallCheckCache = {}
+local CurrentTargetDist = math.huge
+local SwitchThreshold = 20
+local TargetLostTimeout = 0.3
+local WallCheckInterval = 1.5 -- увеличил для кеша, меньше фризов
+
+local targetLostSince = 0
+
+function IsTargetVisible(player)
+    if not SectionSettings.AimBot.CheckWall then return true end
+
+    local now = tick()
+    local cache = WallCheckCache[player]
+
+    if not cache or (now - cache.time > WallCheckInterval) then
+        local camera = workspace.CurrentCamera
+        local localPlayer = game.Players.LocalPlayer
+        local Ignore = {camera}
+        if localPlayer.Character then table.insert(Ignore, localPlayer.Character) end
+        if player.Character then table.insert(Ignore, player.Character) end
+        if player.Parent ~= workspace then table.insert(Ignore, player.Parent) end
+
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return false end
+
+        local obstruct = camera:GetPartsObscuringTarget({hrp.Position}, Ignore)
+        WallCheckCache[player] = {time = now, visible = (#obstruct == 0)}
+        cache = WallCheckCache[player]
+    end
+
+    return cache.visible
+end
+
+function GetClosestTarget(oldTarget)
+    local camera = workspace.CurrentCamera
+    local localPlayer = game.Players.LocalPlayer
+    local mousePos = game.UserInputService:GetMouseLocation()
+    local closest = nil
+    local closestDist = SectionSettings.AimBot.DrawSize or 100 -- только цели внутри круга
+
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if SectionSettings.AimBot.CheckTeam and player.Team == localPlayer.Team then continue end
+            if SectionSettings.AimBot.CheckWhitelist and GlobalWhiteList and GlobalWhiteList[player.Name] then continue end
+            if not IsTargetVisible(player) then continue end
+
+            local hrp = player.Character.HumanoidRootPart
+            local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+            if not onScreen then continue end
+
+            local distScreen = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+
+            if distScreen <= closestDist then
+                closestDist = distScreen
+                closest = player
             end
         end
     end
-    return Closest
+
+    return closest, closestDist
 end
 
 function RunAimbot()
-    game.UserInputService.InputBegan:Connect(function(Key)
-        if not game.UserInputService:GetFocusedTextBox() then
-            if Key.UserInputType == Enum.UserInputType.MouseButton2 then
-                Pressed = true
-                AimTarget = GetClosestTarget()
-            end
+    local Pressed = false
+    local AimTarget = nil
+    local CurrentTargetDist = math.huge
+
+    game.UserInputService.InputBegan:Connect(function(input)
+        if not game.UserInputService:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
+            Pressed = true
+            AimTarget, CurrentTargetDist = GetClosestTarget()
+            targetLostSince = 0
         end
     end)
 
-    game.UserInputService.InputEnded:Connect(function(Key)
-        if not game.UserInputService:GetFocusedTextBox() then
-            if Key.UserInputType == Enum.UserInputType.MouseButton2 then
-                Pressed = false
-                AimTarget = nil
-            end
+    game.UserInputService.InputEnded:Connect(function(input)
+        if not game.UserInputService:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
+            Pressed = false
+            AimTarget = nil
+            CurrentTargetDist = math.huge
+            targetLostSince = 0
         end
     end)
 
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if AimbotEnabled then
-            Magnitude = (game.Workspace.CurrentCamera.Focus.p - game.Workspace.CurrentCamera.CFrame.p).Magnitude
-            CanUsing = Magnitude <= 1.5
-            if Pressed and AimTarget and AimTarget.Character then
-                Humanoid = AimTarget.Character:FindFirstChild("Humanoid")
-                if Humanoid and Humanoid.Health > 0 and CanUsing then
-                    Part = SectionSettings.AimBot.TargetPart
-                    TargetPosition = AimTarget.Character[Part].Position
+    game:GetService("RunService").RenderStepped:Connect(function(dt)
+        if not AimbotEnabled then return end
+
+        local camera = workspace.CurrentCamera
+        local Magnitude = (camera.Focus.p - camera.CFrame.p).Magnitude
+        local CanUsing = Magnitude <= 1.5
+
+        if Pressed then
+            local validTarget = AimTarget and AimTarget.Character and AimTarget.Character:FindFirstChild("Humanoid") 
+                and AimTarget.Character.Humanoid.Health > 0 and IsTargetVisible(AimTarget)
+
+            if not validTarget then
+                AimTarget, CurrentTargetDist = GetClosestTarget()
+                targetLostSince = 0
+            else
+                local hrp = AimTarget.Character.HumanoidRootPart
+                local mousePos = game.UserInputService:GetMouseLocation()
+                local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    local distScreen = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+                    if distScreen > SectionSettings.AimBot.DrawSize then
+                        targetLostSince = targetLostSince + dt
+                        if targetLostSince >= TargetLostTimeout then
+                            AimTarget = nil
+                            CurrentTargetDist = math.huge
+                            targetLostSince = 0
+                        end
+                    else
+                        targetLostSince = 0
+                    end
+                else
+                    AimTarget = nil
+                    CurrentTargetDist = math.huge
+                    targetLostSince = 0
+                end
+
+                -- Переключаем цель ТОЛЬКО если новая лучше и в пределах круга
+                if AimTarget then
+                    local newTarget, newDist = GetClosestTarget()
+                    if newTarget ~= AimTarget and newDist < CurrentTargetDist then
+                        AimTarget = newTarget
+                        CurrentTargetDist = newDist
+                        targetLostSince = 0
+                    end
+                end
+            end
+        else
+            AimTarget = nil
+            CurrentTargetDist = math.huge
+            targetLostSince = 0
+        end
+
+        if Pressed and AimTarget and AimTarget.Character then
+            local Humanoid = AimTarget.Character:FindFirstChild("Humanoid")
+            if Humanoid and Humanoid.Health > 0 and CanUsing then
+                local PartName = SectionSettings.AimBot.TargetPart or "HumanoidRootPart"
+                local TargetPart = AimTarget.Character:FindFirstChild(PartName)
+                if TargetPart then
+                    local TargetPosition = TargetPart.Position
                     if SectionSettings.AimBot.Velocity then
-                        TargetPosition = TargetPosition + AimTarget.Character[Part].Velocity / Predict
+                        TargetPosition = TargetPosition + (TargetPart.Velocity or Vector3.new()) / Predict
                     end
                     if SectionSettings.AimBot.Smooth then
-                        game.Workspace.CurrentCamera.CFrame = game.Workspace.CurrentCamera.CFrame:Lerp(CFrame.new(game.Workspace.CurrentCamera.CFrame.p, TargetPosition), SectionSettings.AimBot.SmoothSize)
+                        camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.p, TargetPosition), SectionSettings.AimBot.SmoothSize)
                     else
-                        game.Workspace.CurrentCamera.CFrame = CFrame.new(game.Workspace.CurrentCamera.CFrame.Position, TargetPosition)
+                        camera.CFrame = CFrame.new(camera.CFrame.Position, TargetPosition)
                     end
                 end
             end
-            if SectionSettings.AimBot.Draw then
-                if not AimbotCircle then
-                    AimbotCircle = Drawing.new("Circle")
-                    AimbotCircle.Color = SectionSettings.AimBot.DrawColor
-                    AimbotCircle.Thickness = 2
-                    AimbotCircle.Radius = SectionSettings.AimBot.DrawSize
-                    AimbotCircle.Filled = false
-                    AimbotCircle.Visible = true
-                    if not AimbotCirclePos then
-                        AimbotCirclePos = game:GetService("RunService").Heartbeat:Connect(function()
-                            AimbotCircle.Position = Vector2.new(game.UserInputService:GetMouseLocation().X, game.UserInputService:GetMouseLocation().Y)
-                        end)
-                    end
+        end
+
+        if SectionSettings.AimBot.Draw then
+            if not AimbotCircle then
+                AimbotCircle = Drawing.new("Circle")
+                AimbotCircle.Color = SectionSettings.AimBot.DrawColor
+                AimbotCircle.Thickness = 2
+                AimbotCircle.Radius = SectionSettings.AimBot.DrawSize
+                AimbotCircle.Filled = false
+                AimbotCircle.Visible = true
+                if not AimbotCirclePos then
+                    AimbotCirclePos = game:GetService("RunService").Heartbeat:Connect(function()
+                        local mousePos = game.UserInputService:GetMouseLocation()
+                        AimbotCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+                    end)
                 end
-            else
-                if AimbotCircle then AimbotCircle:Remove(); AimbotCircle = nil end
-                if AimbotCirclePos then AimbotCirclePos:Disconnect(); AimbotCirclePos = nil end
             end
+        else
+            if AimbotCircle then AimbotCircle:Remove() AimbotCircle = nil end
+            if AimbotCirclePos then AimbotCirclePos:Disconnect() AimbotCirclePos = nil end
         end
     end)
 end
