@@ -96,8 +96,8 @@ CombatRight = Tabs.Combat:AddRightGroupbox('Aimbot')
 CombatLeft2 = Tabs.Combat:AddLeftGroupbox('Silent Aim')
 CombatRight2 = Tabs.Combat:AddRightGroupbox('Ragebot')
 CombatLeft3 = Tabs.Combat:AddLeftGroupbox('Control c4, rocket')
-CombatRight3 = Tabs.Combat:AddRightGroupbox('PepperSpray settings(Guns)')
---CombatLeft4 = Tabs.Combat:AddLeftGroupbox('Others Guns (RISK FOR BAN)')
+CombatRight3 = Tabs.Combat:AddRightGroupbox('PepperSpray settings (Guns)')
+CombatLeft4 = Tabs.Combat:AddLeftGroupbox('Gun Mods')
 
 GlobalWhiteList = {}
 GlobalTarget = {}
@@ -485,8 +485,6 @@ CombatRight:AddToggle('AimbotToggle', {
         end
     end
 }):AddKeyPicker('AimbotKeyPicker', {
-
-    
     Default = 'None',
     SyncToggleState = true,
     Mode = 'Hold',
@@ -1591,7 +1589,7 @@ CombatRight3:AddToggle('PepperSprayCheckWhitelist', {
     end
 })
 
---[[Settings = {
+Settings = {
     Enabled = false,
     Color = Color3.fromRGB(255, 0, 0),
     Transparency = 0
@@ -1615,29 +1613,6 @@ safeGet = function(obj, path, default)
     end
     return current
 end
-
-CombatLeft4:AddToggle('Wallbang', {
-    Text = "Wallbang",
-    Default = false,
-    Callback = function(State)
-        wallbangEnabled = State
-        workspaceService = game:GetService("Workspace")
-        map = workspaceService:FindFirstChild("Map")
-        if map then
-            parts = map:FindFirstChild("Parts")
-            if parts then
-                mParts = parts:FindFirstChild("M_Parts")
-                if mParts then
-                    if wallbangEnabled and mParts.Parent ~= workspaceService:FindFirstChild("Characters") then
-                        mParts.Parent = workspaceService:FindFirstChild("Characters")
-                    elseif not wallbangEnabled and mParts.Parent ~= parts then
-                        mParts.Parent = parts
-                    end
-                end
-            end
-        end
-    end
-})
 
 CombatLeft4:AddToggle('InstantReload', {
     Text = "Instant Reload",
@@ -1725,11 +1700,19 @@ instantreloadL = function()
     if toolConn then toolConn:Disconnect() end
 end
 
+local lastScanTime = 0
+local scanCooldown = 10
+local initializedModules = {}
+
 GunModules = function()
-    if not gunModulesCache[tick()] then
+    if tick() - lastScanTime > scanCooldown then
+        lastScanTime = tick()
         gunModulesCache = {}
-        for i, v in pairs(getgc(true)) do
-            if type(v) == 'table' and rawget(v, 'EquipTime') then
+
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "EquipTime") then
+                gunModulesCache[v] = true
+
                 if not originalValues[v] then
                     originalValues[v] = {
                         Recoil = v.Recoil or 0,
@@ -1747,54 +1730,44 @@ GunModules = function()
                         FireModeSettings = type(v.FireModeSettings) == 'table' and table.clone(v.FireModeSettings) or v.FireModeSettings
                     }
                 end
-                gunModulesCache[v] = true
-                if Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value then
-                    v.Recoil = 0
-                    v.AngleX_Min = 0
-                    v.AngleX_Max = 0
-                    v.AngleY_Min = 0
-                    v.AngleY_Max = 0
-                    v.AngleZ_Min = 0
-                    v.AngleZ_Max = 0
-                else
-                    v.Recoil = originalValues[v].Recoil
-                    v.AngleX_Min = originalValues[v].AngleX_Min
-                    v.AngleX_Max = originalValues[v].AngleX_Max
-                    v.AngleY_Min = originalValues[v].AngleY_Min
-                    v.AngleY_Max = originalValues[v].AngleY_Max
-                    v.AngleZ_Min = originalValues[v].AngleZ_Min
-                    v.AngleZ_Max = originalValues[v].AngleZ_Max
-                end
-                if Toggles and Toggles.Spread and Toggles.Spread.Value then
-                    v.Spread = 0
-                else
-                    v.Spread = originalValues[v].Spread
-                end
-                if Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value then
-                    equipTime = safeGet(Options, {"EquipTimeAmount", "Value"}, 0)
-                    v.EquipTime = equipTime
-                else
-                    v.EquipTime = originalValues[v].EquipTime or 0.5
-                end
-                if Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value then
-                    if v.AimSettings and v.SniperSettings then
-                        aimSpeed = safeGet(Options, {"AimSpeedAmount", "Value"}, 0)
-                        v.AimSettings.AimSpeed = aimSpeed
-                        v.SniperSettings.AimSpeed = aimSpeed
-                    end
-                else
-                    if v.AimSettings and v.SniperSettings then
-                        v.AimSettings.AimSpeed = originalValues[v].AimSpeed
-                        v.SniperSettings.AimSpeed = originalValues[v].AimSpeed
-                    end
-                end
             end
         end
-        spawn(function()
-            wait(60)
-            gunModulesCache = {}
-        end)
     end
+
+    -- Асинхронно применяем изменения
+    task.defer(function()
+        for v in pairs(gunModulesCache) do
+            local orig = originalValues[v]
+            if not orig then continue end
+
+            if Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value then
+                v.Recoil = 0
+                v.AngleX_Min = 0
+                v.AngleX_Max = 0
+                v.AngleY_Min = 0
+                v.AngleY_Max = 0
+                v.AngleZ_Min = 0
+                v.AngleZ_Max = 0
+            else
+                v.Recoil = orig.Recoil
+                v.AngleX_Min = orig.AngleX_Min
+                v.AngleX_Max = orig.AngleX_Max
+                v.AngleY_Min = orig.AngleY_Min
+                v.AngleY_Max = orig.AngleY_Max
+                v.AngleZ_Min = orig.AngleZ_Min
+                v.AngleZ_Max = orig.AngleZ_Max
+            end
+
+            v.Spread = (Toggles and Toggles.Spread and Toggles.Spread.Value) and 0 or orig.Spread
+            v.EquipTime = (Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value) and safeGet(Options, {"EquipTimeAmount", "Value"}, 0) or orig.EquipTime
+
+            if v.AimSettings and v.SniperSettings then
+                local aimSpeed = (Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value) and safeGet(Options, {"AimSpeedAmount", "Value"}, 0) or orig.AimSpeed
+                v.AimSettings.AimSpeed = aimSpeed
+                v.SniperSettings.AimSpeed = aimSpeed
+            end
+        end
+    end)
 end
 
 CombatLeft4:AddToggle('NoRecoil', {
@@ -1812,74 +1785,6 @@ CombatLeft4:AddToggle('Spread', {
     Tooltip = 'Eliminates bullet spread',
     Callback = function(Value)
         GunModules()
-    end
-})
-
-CombatLeft4:AddToggle('EquipAnimSpeed', {
-    Text = 'Equip Anim Speed',
-    Default = false,
-    Tooltip = 'Adjusts weapon equip animation speed',
-    Callback = function(Value)
-        GunModules()
-    end
-})
-
-CombatLeft4:AddToggle('AimAnimSpeed', {
-    Text = 'Aim Anim Speed',
-    Default = false,
-    Tooltip = 'Adjusts aiming animation speed',
-    Callback = function(Value)
-        GunModules()
-    end
-})
-
-BulletTracer = CombatLeft4:AddToggle('BulletTracerToggle', {
-    Text = 'Bullet Tracer',
-    Default = false,
-    Callback = function(Value)
-        Settings.Enabled = Value
-        if not Value then
-            for _, tracerData in pairs(activeTracers) do
-                if tracerData.tracer and tracerData.tracer:IsDescendantOf(game) then
-                    tracerData.tracer:Destroy()
-                end
-            end
-            activeTracers = {}
-        end
-    end
-})
-
-BulletTracer:AddColorPicker('BulletColorPicker', {
-    Default = Settings.Color,
-    Title = 'BulletTracer Color',
-    Callback = function(Value)
-        Settings.Color = Value
-    end
-})
-
-CombatLeft4:AddSlider('EquipTimeAmount', {
-    Text = 'Equip Speed Amount',
-    Default = 0,
-    Min = 0,
-    Max = 5,
-    Rounding = 1,
-    Callback = function(Value)
-        if Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value then
-            GunModules()
-        end
-    end
-})
-
-CombatLeft4:AddSlider('AimSpeedAmount', {
-    Text = 'Aim Speed Amount',
-    Default = 0,
-    Min = 0,
-    Max = 5,
-    Rounding = 1,
-    Callback = function(Value)
-        if Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value then
-            GunModules()
-        end
     end
 })
 
@@ -2067,7 +1972,7 @@ characterAddedConn = Players.LocalPlayer.CharacterAdded:Connect(function(newChar
             GunModules()
         end
     end)
-end) ]]
+end)
 
 VisualsLeft = Tabs.Visuals:AddLeftGroupbox('Player esp')
 VisualsRight = Tabs.Visuals:AddRightGroupbox('Extra esp')
@@ -9664,27 +9569,27 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 Messages = {
-    LQNHUB = {
-        "LQN HUB vibes! Dominate with style!",
-        "Unleash chaos with LQN HUB power!",
-        "Top-tier gameplay? LQN HUB way!",
-        "Crush it with LQN HUB magic!",
-        "LQN HUB hype! Rule the game!",
-        "Stay ahead with LQN HUB elite!",
-        "Game just got better! LQN HUB zone!",
-        "LQN HUB flow! Outplay everyone!",
-        "Be a legend with LQN HUB rise!",
-        "Own the game with LQN HUB energy!",
-        "LQN HUB squad! Lead the pack!",
-        "Pros choose LQN HUB glory!",
-        "Level up your game! LQN HUB fire!",
-        "LQN HUB rush! Make every moment count!",
-        "Master the game with LQN HUB skill!",
-        "No one stops LQN HUB!",
-        "Game’s finest? That’s LQN HUB!",
-        "LQN HUB spark! Ignite your run!",
-        "Play smarter with LQN HUB edge!",
-        "Domination starts with LQN HUB!"
+    SteelHub = {
+        "SteelHub vibes! Dominate with style!",
+        "Unleash chaos with SteelHub power!",
+        "Top-tier gameplay? SteelHub way!",
+        "Crush it with SteelHub magic!",
+        "SteelHub hype! Rule the game!",
+        "Stay ahead with SteelHub elite!",
+        "Game just got better! SteelHub zone!",
+        "SteelHub flow! Outplay everyone!",
+        "Be a legend with SteelHub rise!",
+        "Own the game with SteelHub energy!",
+        "SteelHub squad! Lead the pack!",
+        "Pros choose SteelHub glory!",
+        "Level up your game! SteelHub fire!",
+        "SteelHub rush! Make every moment count!",
+        "Master the game with SteelHub skill!",
+        "No one stops SteelHub!",
+        "Game’s finest? That’s SteelHub!",
+        "SteelHub spark! Ignite your run!",
+        "Play smarter with SteelHub edge!",
+        "Domination starts with SteelHub!"
     },
     Russian = {
         "Я в игре, и это уже победа!",
@@ -10178,7 +10083,7 @@ Messages = {
 }
 
 IsSpamming = false
-SelectedMode = "LQNHUB"
+SelectedMode = "SteelHub"
 TrashTalkLanguage = "English"
 LastMessageTime = 0
 Cooldown = 2.6
@@ -10192,7 +10097,7 @@ MiscRight4:AddToggle('SpamToggle', {
 })
 
 MiscRight4:AddDropdown('ModeDropdown', {
-    Values = { 'LQNHUB', 'Russian', 'English', 'TrashTalk' },
+    Values = { 'SteelHub', 'Russian', 'English', 'TrashTalk' },
     Default = 1,
     Text = 'Message Type',
     Callback = function(Value)
