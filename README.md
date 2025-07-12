@@ -2112,6 +2112,30 @@ CombatLeft4:AddToggle('Spread', {
     end
 })
 
+BulletTracer = CombatLeft4:AddToggle('BulletTracerToggle', {
+    Text = 'Bullet Tracer',
+    Default = false,
+    Callback = function(Value)
+        Settings.Enabled = Value
+        if not Value then
+            for _, tracerData in pairs(activeTracers) do
+                if tracerData.tracer and tracerData.tracer:IsDescendantOf(game) then
+                    tracerData.tracer:Destroy()
+                end
+            end
+            activeTracers = {}
+        end
+    end
+})
+
+BulletTracer:AddColorPicker('BulletColorPicker', {
+    Default = Settings.Color,
+    Title = 'BulletTracer Color',
+    Callback = function(Value)
+        Settings.Color = Value
+    end
+})
+
 createTracer = function(startPos, endPos)
     if not Settings.Enabled then return end
     if not startPos or not endPos then return end
