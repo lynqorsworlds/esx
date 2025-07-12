@@ -5238,6 +5238,133 @@ HUDToggle:AddColorPicker('HUDColorPicker', {
     end
 })
 
+FakeVisorGUI = Instance.new('ScreenGui')
+FakeVisorGUI.Name = "FakeVisorGUI"
+FakeVisorGUI.Parent = game.Players.LocalPlayer.PlayerGui
+FakeVisorGUI.IgnoreGuiInset = true
+FakeVisorGUI.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+FakeVisorGUI.Enabled = false
+
+VisorGrainImage = Instance.new('ImageLabel')
+VisorGrainImage.Name = "VisorGrainImage"
+VisorGrainImage.Parent = FakeVisorGUI
+VisorGrainImage.Image = "rbxassetid://28756351"
+VisorGrainImage.ImageTransparency = 0.8999999761581421
+VisorGrainImage.ScaleType = Enum.ScaleType.Tile
+VisorGrainImage.TileSize = UDim2.new(0.19699999690055847, 0, 0.17299999296665192, 0)
+VisorGrainImage.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+VisorGrainImage.BackgroundTransparency = 1
+VisorGrainImage.BorderSizePixel = 0
+VisorGrainImage.Size = UDim2.new(1, 0, 1, 0)
+VisorGrainImage.ZIndex = 10
+
+FakeVisorOverlay = Instance.new('Frame')
+FakeVisorOverlay.Name = "FakeVisorOverlay"
+FakeVisorOverlay.Parent = FakeVisorGUI
+FakeVisorOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+FakeVisorOverlay.BackgroundTransparency = 1
+FakeVisorOverlay.BorderSizePixel = 0
+FakeVisorOverlay.Size = UDim2.new(1, 0, 1, 0)
+
+VisorBar = Instance.new('Frame')
+VisorBar.Name = "VisorBar"
+VisorBar.Parent = FakeVisorOverlay
+VisorBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+VisorBar.BackgroundTransparency = 0
+VisorBar.BorderSizePixel = 0
+VisorBar.Position = UDim2.new(0.7518296837806702, 0, 0, 0)
+VisorBar.Size = UDim2.new(0.24817033112049103, 0, 1, 0)
+VisorBar.ZIndex = 3
+
+VisorBar2 = Instance.new('Frame')
+VisorBar2.Name = "VisorBar2"
+VisorBar2.Parent = FakeVisorOverlay
+VisorBar2.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+VisorBar2.BackgroundTransparency = 0
+VisorBar2.BorderSizePixel = 0
+VisorBar2.Position = UDim2.new(0, 0, 0, 0)
+VisorBar2.Size = UDim2.new(0.24817033112049103, 0, 1, 0)
+VisorBar2.ZIndex = 3
+
+ColorCorrection = Instance.new('ColorCorrectionEffect')
+ColorCorrection.Name = "FakeVisorGUI"
+ColorCorrection.Parent = workspace.CurrentCamera
+ColorCorrection.Brightness = 0
+ColorCorrection.Contrast = -0.1
+ColorCorrection.Saturation = -0.5
+ColorCorrection.TintColor = Color3.fromRGB(120, 120, 120)
+ColorCorrection.Enabled = false
+
+function applyHighlightToPlayer(character)
+    if character and character ~= game.Players.LocalPlayer.Character and character:FindFirstChild("HumanoidRootPart") then
+        highlight = Instance.new("Highlight")
+        highlight.Name = "FakeVisorHighlight"
+        highlight.Parent = character
+        highlight.FillColor = Color3.fromRGB(255, 255, 255)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0
+        highlight.OutlineTransparency = 1
+        highlight.Enabled = FakeVisorGUI.Enabled
+
+        game:GetService("RunService").RenderStepped:Connect(function()
+            if character and character:FindFirstChild("HumanoidRootPart") and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and FakeVisorGUI.Enabled then
+                rayParams = RaycastParams.new()
+                rayParams.FilterDescendantsInstances = {game.Players.LocalPlayer.Character}
+                rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                rayResult = workspace:Raycast(
+                    workspace.CurrentCamera.CFrame.Position,
+                    (character.HumanoidRootPart.Position - workspace.CurrentCamera.CFrame.Position).Unit * 2000,
+                    rayParams
+                )
+                highlight.Enabled = rayResult and rayResult.Instance and rayResult.Instance:IsDescendantOf(character) and FakeVisorGUI.Enabled
+            else
+                highlight.Enabled = false
+            end
+        end)
+    end
+end
+
+function applyHighlightToPlayers()
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and player.Character then
+            applyHighlightToPlayer(player.Character)
+        end
+    end
+end
+
+game.Players.PlayerAdded:Connect(function(player)
+    if player ~= game.Players.LocalPlayer then
+        player.CharacterAdded:Connect(function(character)
+            wait()
+            applyHighlightToPlayer(character)
+        end)
+    end
+end)
+
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+    wait()
+    applyHighlightToPlayers()
+end)
+
+applyHighlightToPlayers()
+
+VisualsLeft2:AddToggle('FakeVisorToggle', {
+    Text = 'FakeVisor+',
+    Default = false,
+    Callback = function(Value)
+        FakeVisorGUI.Enabled = Value
+        ColorCorrection.Enabled = Value
+        for _, player in pairs(game.Players:GetPlayers()) do
+            if player ~= game.Players.LocalPlayer and player.Character then
+                highlight = player.Character:FindFirstChild("FakeVisorHighlight")
+                if highlight then
+                    highlight.Enabled = Value
+                end
+            end
+        end
+    end
+})
+
 VisualsLeft2:AddToggle('RainToggle', {
     Text = "Rain",
     Default = false,
