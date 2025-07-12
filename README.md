@@ -1776,6 +1776,12 @@ CombatLeft5:AddToggle('AutoBlock', {
             stopAutoblock()
         end
     end
+}):AddKeyPicker('AutoBlockKey', {
+    Default = 'None', -- можешь заменить на любую клавишу
+    SyncToggleState = true, -- синхронизация с Toggle
+    Mode = 'Toggle', -- или 'Hold', если хочешь зажать
+    Text = 'AutoBlock Key',
+    Callback = function() end -- не нужен, всё делает SyncToggleState
 })
 
 local Players = game:GetService("Players")
@@ -1936,7 +1942,7 @@ CombatLeft5:AddToggle('HeatAura', {
 	Tooltip = "Automatically destroys enemy head with laser (NEEDS HEAT VISION TOOL EQUIPPED)",
 	Callback = HvAura
 }):AddKeyPicker('HeatAuraKey', {
-	Default = 'G',
+	Default = 'None',
 	SyncToggleState = true,
 	Mode = 'Toggle',
 	Text = 'Heat Vision Aura Key',
