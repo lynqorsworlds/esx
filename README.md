@@ -1,3 +1,15 @@
+if identifyexecutor and typeof(identifyexecutor) == "function" then
+    local executor = identifyexecutor()
+    if typeof(executor) == "string" then
+        if executor:lower():find("solara") then
+            game.Players.LocalPlayer:Kick("Using Solara executor is prohibited.")
+            return
+        else
+            print("✅ Verification passed. Your executor: " .. executor .. " is supported.\n")
+        end
+    end
+end
+
 local repo = 'https://raw.githubusercontent.com/yourmakerqkeso/EverloseLib/main/'
 
 Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
@@ -1701,68 +1713,75 @@ instantreloadL = function()
 end
 
 local lastScanTime = 0
-local scanCooldown = 10
+local scanCooldown = 5
 local initializedModules = {}
+local gunModulesCache = {}
+local originalValues = {}
+
+task.spawn(function()
+    while true do
+        task.wait(scanCooldown)
+        GunModules() 
+    end
+end)
 
 GunModules = function()
-    if tick() - lastScanTime > scanCooldown then
+    local shouldScan = Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value
+    if shouldScan and tick() - lastScanTime > scanCooldown then
         lastScanTime = tick()
-        gunModulesCache = {}
 
         for _, v in pairs(getgc(true)) do
             if type(v) == "table" and rawget(v, "EquipTime") then
-                gunModulesCache[v] = true
+                if not gunModulesCache[v] then
+                    gunModulesCache[v] = true
 
-                if not originalValues[v] then
-                    originalValues[v] = {
-                        Recoil = v.Recoil or 0,
-                        AngleX_Min = v.AngleX_Min or 0,
-                        AngleX_Max = v.AngleX_Max or 0,
-                        AngleY_Min = v.AngleY_Min or 0,
-                        AngleY_Max = v.AngleY_Max or 0,
-                        AngleZ_Min = v.AngleZ_Min or 0,
-                        AngleZ_Max = v.AngleZ_Max or 0,
-                        Spread = v.Spread or 0,
-                        EquipTime = v.EquipTime or 0.5,
-                        AimSpeed = (v.AimSettings and v.AimSettings.AimSpeed) or 1,
-                        ChargeTime = v.ChargeTime or 0,
-                        SlowDown = v.SlowDown or 0,
-                        FireModeSettings = type(v.FireModeSettings) == 'table' and table.clone(v.FireModeSettings) or v.FireModeSettings
-                    }
+                    if not originalValues[v] then
+                        originalValues[v] = {
+                            Recoil = v.Recoil or 0,
+                            AngleX_Min = v.AngleX_Min or 0,
+                            AngleX_Max = v.AngleX_Max or 0,
+                            AngleY_Min = v.AngleY_Min or 0,
+                            AngleY_Max = v.AngleY_Max or 0,
+                            AngleZ_Min = v.AngleZ_Min or 0,
+                            AngleZ_Max = v.AngleZ_Max or 0,
+                            Spread = v.Spread or 0,
+                            EquipTime = v.EquipTime or 0.5,
+                            AimSpeed = (v.AimSettings and v.AimSettings.AimSpeed) or 1,
+                            ChargeTime = v.ChargeTime or 0,
+                            SlowDown = v.SlowDown or 0,
+                            FireModeSettings = type(v.FireModeSettings) == "table" and table.clone(v.FireModeSettings) or v.FireModeSettings
+                        }
+                    end
                 end
             end
         end
     end
 
-    -- Асинхронно применяем изменения
     task.defer(function()
         for v in pairs(gunModulesCache) do
             local orig = originalValues[v]
             if not orig then continue end
 
-            if Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value then
-                v.Recoil = 0
-                v.AngleX_Min = 0
-                v.AngleX_Max = 0
-                v.AngleY_Min = 0
-                v.AngleY_Max = 0
-                v.AngleZ_Min = 0
-                v.AngleZ_Max = 0
-            else
-                v.Recoil = orig.Recoil
-                v.AngleX_Min = orig.AngleX_Min
-                v.AngleX_Max = orig.AngleX_Max
-                v.AngleY_Min = orig.AngleY_Min
-                v.AngleY_Max = orig.AngleY_Max
-                v.AngleZ_Min = orig.AngleZ_Min
-                v.AngleZ_Max = orig.AngleZ_Max
-            end
+            local isNoRecoil = Toggles and Toggles.NoRecoil and Toggles.NoRecoil.Value
+
+            v.Recoil = isNoRecoil and 0 or orig.Recoil
+            v.AngleX_Min = isNoRecoil and 0 or orig.AngleX_Min
+            v.AngleX_Max = isNoRecoil and 0 or orig.AngleX_Max
+            v.AngleY_Min = isNoRecoil and 0 or orig.AngleY_Min
+            v.AngleY_Max = isNoRecoil and 0 or orig.AngleY_Max
+            v.AngleZ_Min = isNoRecoil and 0 or orig.AngleZ_Min
+            v.AngleZ_Max = isNoRecoil and 0 or orig.AngleZ_Max
 
             v.Spread = (Toggles and Toggles.Spread and Toggles.Spread.Value) and 0 or orig.Spread
-            v.EquipTime = (Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value) and safeGet(Options, {"EquipTimeAmount", "Value"}, 0) or orig.EquipTime
+            v.EquipTime = (Toggles and Toggles.EquipAnimSpeed and Toggles.EquipAnimSpeed.Value)
+                and safeGet(Options, {"EquipTimeAmount", "Value"}, 0)
+                or orig.EquipTime
 
             if v.AimSettings and v.SniperSettings then
-                local aimSpeed = (Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value) and safeGet(Options, {"AimSpeedAmount", "Value"}, 0) or orig.AimSpeed
+                local aimSpeed = (Toggles and Toggles.AimAnimSpeed and Toggles.AimAnimSpeed.Value)
+                    and safeGet(Options, {"AimSpeedAmount", "Value"}, 0)
+                    or orig.AimSpeed
+
                 v.AimSettings.AimSpeed = aimSpeed
                 v.SniperSettings.AimSpeed = aimSpeed
             end
