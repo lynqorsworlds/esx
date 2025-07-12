@@ -1761,7 +1761,7 @@ end
 CombatLeft5:AddToggle('AutoBlock', {
     Text = "Auto Block",
     Default = false,
-    Tooltip = "Automatically block melee attacks",
+    Tooltip = "Automatically block melee attacks (DONT WORK WITH MELEE AURA)",
     Callback = function(Value)
         if Value then
             setupAutoblock()
