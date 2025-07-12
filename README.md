@@ -2,7 +2,7 @@ if identifyexecutor and typeof(identifyexecutor) == "function" then
     local executor = identifyexecutor()
     if typeof(executor) == "string" then
         if executor:lower():find("solara") then
-            game.Players.LocalPlayer:Kick("Your executor is not supported.")
+            game.Players.LocalPlayer:Kick("Using Solara executor is prohibited.")
             return
         else
             print("✅ Verification passed. Your executor: " .. executor .. " is supported.\n")
@@ -102,6 +102,7 @@ remote1 = game:GetService("ReplicatedStorage").Events["XMHH.2"]
 remote2 = game:GetService("ReplicatedStorage").Events["XMHH2.2"]
 
 CombatLeft = Tabs.Combat:AddLeftGroupbox('Whitelist & Target')
+CombatLeft5 = Tabs.Combat:AddLeftGroupbox('Fists')
 CombatLeft1 = Tabs.Combat:AddLeftGroupbox('MeleeAura')
 CombatRight4 = Tabs.Combat:AddRightGroupbox('MeleeReach')
 CombatRight = Tabs.Combat:AddRightGroupbox('Aimbot')
@@ -1634,6 +1635,138 @@ CombatLeft4:AddToggle('InstantReload', {
         functions.instant_reloadF = Value
         if Value then
             spawn(instantreloadL)
+        end
+    end
+})
+
+local vim = game:GetService("VirtualInputManager")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local excludedTools = {"Balisong", "Bayonet", "BlackBayonet", "Shovel", "Chainsaw", "Fire-Axe", "Broom", "Clippers", "ERADICATOR", "ERADICATORII", "FrozenScythe", "Scythe", "GladiatorSword", "SlayerSword"}
+local localPlayerExcludedTools = {"Shovel", "Chainsaw", "Fire-Axe", "Crowbar", "CandyCrowbar", "__ZombieFists1", "__ZombieFists2", "__ZombieFists3", "__ZombieFists4", "Clippers", "Golfclub", "Bayonet", "BlackBayonet", "Balisong", "Broom", "CursedDagger", "Rambo", "Shiv", "Wrench"}
+local validAnimationNames = {"Slash1", "Slash2", "Slash3"}
+local toolAnimationCache = {}
+local isBlocking = false
+local steppedConnection -- для хранения подключения RunService
+
+local function block(condition)
+    vim:SendKeyEvent(condition, "Q", false, game)
+end
+
+local function getAnimationIdsFromAnimsFolder(character, toolName)
+    if toolAnimationCache[toolName] then
+        return toolAnimationCache[toolName]
+    end
+
+    local animIds = {}
+    local animsFolder = workspace.Characters:FindFirstChild(character.Name)
+        and workspace.Characters[character.Name]:FindFirstChild(toolName)
+        and workspace.Characters[character.Name][toolName]:FindFirstChild("AnimsFolder")
+    
+    if animsFolder then
+        for _, anim in ipairs(animsFolder:GetChildren()) do
+            if anim:IsA("Animation") and anim.AnimationId and table.find(validAnimationNames, anim.Name) then
+                table.insert(animIds, anim.AnimationId)
+            end
+        end
+    end
+    toolAnimationCache[toolName] = animIds
+    return animIds
+end
+
+local function handleBlock(toolName)
+    if not isBlocking then
+        isBlocking = true
+        block(true)
+        if toolName == "Sledgehammer" or toolName == "Metal-Bat" then
+            wait(0.8)
+        else
+            wait(0.5)
+        end
+        block(false)
+        isBlocking = false
+    end
+end
+
+local function setupAnimationTracking(player, tool, animIds)
+    local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+
+    local connection
+    connection = humanoid.AnimationPlayed:Connect(function(animationTrack)
+        if table.find(animIds, animationTrack.Animation.AnimationId) and animationTrack.IsPlaying then
+            local localPlayer = Players.LocalPlayer
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance < 10 then
+                    coroutine.wrap(function()
+                        handleBlock(tool.Name)
+                    end)()
+                end
+            end
+        end
+    end)
+
+    tool.AncestryChanged:Connect(function()
+        if not tool:IsDescendantOf(player.Character) then
+            connection:Disconnect()
+        end
+    end)
+    humanoid.Died:Connect(function()
+        connection:Disconnect()
+    end)
+end
+
+local function setupAutoblock()
+    steppedConnection = RunService.Stepped:Connect(function()
+        local localPlayer = Players.LocalPlayer
+        if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            return
+        end
+
+        local localTool = localPlayer.Character:FindFirstChildWhichIsA("Tool")
+        if localTool and table.find(localPlayerExcludedTools, localTool.Name) then
+            return
+        end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local tool = player.Character:FindFirstChildWhichIsA("Tool")
+                if tool and not tool:FindFirstChild("IsGun") then
+                    local isSledgehammer = localTool and localTool.Name == "Sledgehammer"
+                    if (isSledgehammer and tool.Name == "Shovel") or not table.find(excludedTools, tool.Name) then
+                        local animIds = getAnimationIdsFromAnimsFolder(player.Character, tool.Name)
+                        if animIds and #animIds > 0 then
+                            setupAnimationTracking(player, tool, animIds)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function stopAutoblock()
+    if steppedConnection then
+        steppedConnection:Disconnect()
+        steppedConnection = nil
+    end
+    if isBlocking then
+        block(false)
+        isBlocking = false
+    end
+end
+
+CombatLeft5:AddToggle('AutoBlock', {
+    Text = "Auto Block",
+    Default = false,
+    Tooltip = "Automatically block melee attacks",
+    Callback = function(Value)
+        if Value then
+            setupAutoblock()
+        else
+            stopAutoblock()
         end
     end
 })
