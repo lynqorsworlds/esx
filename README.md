@@ -1,12 +1,19 @@
 if identifyexecutor and typeof(identifyexecutor) == "function" then
     local executor = identifyexecutor()
     if typeof(executor) == "string" then
-        if executor:lower():find("solara") then
-            game.Players.LocalPlayer:Kick("Your executor is not supported.")
-            return
-        else
-            print("✅ Verification passed. Your executor: " .. executor .. " is supported.\n")
+        local blockedExecutors = {
+            "velocity", "jjsploit", "xeno", "mobile", "solara", "luna"
+        }
+
+        local lowered = executor:lower()
+        for _, bad in ipairs(blockedExecutors) do
+            if lowered:find(bad) then
+                game.Players.LocalPlayer:Kick("Your executor is not supported!")
+                return
+            end
         end
+
+        print("✅ Verification passed. Your executor: " .. executor .. " is supported.\n")
     end
 end
 
@@ -10736,8 +10743,8 @@ SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({'MenuKeybind'})
 
-ThemeManager:SetFolder('Criminol')
-SaveManager:SetFolder('Criminol/configs')
+ThemeManager:SetFolder('LQN')
+SaveManager:SetFolder('LQN/configs')
 
 SaveManager:BuildConfigSection(Tabs.Settings)
 ThemeManager:ApplyToTab(Tabs.Settings)
