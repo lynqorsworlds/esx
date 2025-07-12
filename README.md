@@ -109,7 +109,7 @@ remote1 = game:GetService("ReplicatedStorage").Events["XMHH.2"]
 remote2 = game:GetService("ReplicatedStorage").Events["XMHH2.2"]
 
 CombatLeft = Tabs.Combat:AddLeftGroupbox('Whitelist & Target')
-CombatLeft5 = Tabs.Combat:AddLeftGroupbox('Fists')
+CombatLeft5 = Tabs.Combat:AddLeftGroupbox('Cool functions')
 CombatLeft1 = Tabs.Combat:AddLeftGroupbox('MeleeAura')
 CombatRight4 = Tabs.Combat:AddRightGroupbox('MeleeReach')
 CombatRight = Tabs.Combat:AddRightGroupbox('Aimbot')
@@ -1776,6 +1776,171 @@ CombatLeft5:AddToggle('AutoBlock', {
             stopAutoblock()
         end
     end
+})
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local hvAuraActive = false
+local remote4 = nil
+local isPlayerAlive = false
+
+local function getRemote()
+	local character = LocalPlayer.Character
+	local success, result = pcall(function()
+		return character and character:FindFirstChild("_CompoundXVision") and character._CompoundXVision:FindFirstChild("RemoteFunction")
+	end)
+	return success and result or nil
+end
+
+local function checkAlive()
+	local character = LocalPlayer.Character
+	local humanoid = character and character:FindFirstChild("Humanoid")
+	isPlayerAlive = character and humanoid and humanoid.Health > 0
+	return isPlayerAlive
+end
+
+local function getClosestTarget()
+	local character = LocalPlayer.Character
+	if not character then return nil end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then return nil end
+
+	local closest, minDist = nil, math.huge
+	for _, target in pairs(Workspace.Characters:GetChildren()) do
+		if target ~= character and target:FindFirstChild("HumanoidRootPart") and target:FindFirstChild("Humanoid") and target.Humanoid.Health > 0 then
+			local dist = (target.HumanoidRootPart.Position - root.Position).Magnitude
+			if dist < minDist then
+				minDist = dist
+				closest = target
+			end
+		end
+	end
+	return closest
+end
+
+local function fireHV(target)
+	if not remote4 or not target or not target:FindFirstChild("Head") then return false end
+	local head = target.Head
+	local pos = head.Position
+	local normal = Vector3.new(0, 1, 0)
+
+	local success = pcall(function()
+		remote4:InvokeServer("ToggleEyes", true)
+	end)
+	if not success then return false end
+
+	success = pcall(function()
+		remote4:InvokeServer("ToggleLaser", true, {
+			Normal = normal,
+			Material = Enum.Material.Air,
+			RayLength = 0,
+			Position = pos
+		}, {}, 0.1)
+	end)
+	if not success then return false end
+
+	success = pcall(function()
+		remote4:InvokeServer("UpdateLaser", {
+			Normal = normal,
+			Material = Enum.Material.Air,
+			Position = pos
+		}, {}, 0.1)
+	end)
+	if not success then return false end
+
+	success = pcall(function()
+		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		local dir = (pos - (root and root.Position or pos)).Unit
+		remote4:InvokeServer("Hit", 0.1, head, pos, dir, Enum.Material.Plastic)
+	end)
+
+	return success
+end
+
+local function disableAura()
+	if not remote4 then return end
+	pcall(function() remote4:InvokeServer("ToggleEyes", false) end)
+	pcall(function() remote4:InvokeServer("ToggleLaser", false, false) end)
+end
+
+-- 🎯 Главная функция включения/выключения
+function HvAura(state)
+	hvAuraActive = state
+
+	if state then
+		remote4 = getRemote()
+		if not remote4 then
+			warn("Remote not found")
+			hvAuraActive = false
+			return
+		end
+		checkAlive()
+	else
+		disableAura()
+	end
+end
+
+-- 🌐 Обработка возрождения
+LocalPlayer.CharacterAdded:Connect(function()
+	isPlayerAlive = true
+	if hvAuraActive then
+		remote4 = getRemote()
+	end
+end)
+
+LocalPlayer.CharacterRemoving:Connect(function()
+	isPlayerAlive = false
+	if hvAuraActive then
+		disableAura()
+	end
+end)
+
+Workspace.Characters.ChildAdded:Connect(function()
+	if hvAuraActive and isPlayerAlive then
+		remote4 = getRemote()
+	end
+end)
+
+checkAlive()
+
+-- 🔁 Основной цикл
+task.spawn(function()
+	while true do
+		if hvAuraActive and isPlayerAlive and remote4 then
+			local target = getClosestTarget()
+			if target then
+				while hvAuraActive and isPlayerAlive and target and target:FindFirstChild("Humanoid") and target.Humanoid.Health > 0 do
+					local ok = fireHV(target)
+					if not ok then break end
+					task.wait(0.05)
+				end
+				if hvAuraActive and isPlayerAlive then
+					disableAura()
+					task.wait(0.1)
+					pcall(function() remote4:InvokeServer("ToggleEyes", true) end)
+				end
+			else
+				task.wait(0.25)
+			end
+		else
+			task.wait(0.5)
+		end
+	end
+end)
+
+CombatLeft5:AddToggle('HeatAura', {
+	Text = "Heat Vision Aura",
+	Default = false,
+	Tooltip = "Automatically destroys enemy head with laser (NEEDS HEAT VISION TOOL EQUIPPED)",
+	Callback = HvAura
+}):AddKeyPicker('HeatAuraKey', {
+	Default = 'G',
+	SyncToggleState = true,
+	Mode = 'Toggle',
+	Text = 'Heat Vision Aura Key',
+	Callback = function() end
 })
 
 instantreloadL = function()
