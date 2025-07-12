@@ -2,7 +2,7 @@ if identifyexecutor and typeof(identifyexecutor) == "function" then
     local executor = identifyexecutor()
     if typeof(executor) == "string" then
         if executor:lower():find("solara") then
-            game.Players.LocalPlayer:Kick("Using Solara executor is prohibited.")
+            game.Players.LocalPlayer:Kick("Your executor is not supported.")
             return
         else
             print("✅ Verification passed. Your executor: " .. executor .. " is supported.\n")
