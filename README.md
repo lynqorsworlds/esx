@@ -689,8 +689,21 @@ function RunAimbot()
     game.UserInputService.InputBegan:Connect(function(input)
         if not game.UserInputService:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
             Pressed = true
-            AimTarget, CurrentTargetDist = GetClosestTarget()
-            targetLostSince = 0
+            -- При первом нажатии пробуем получить цель
+            local target, dist = GetClosestTarget()
+            if SectionSettings.AimBot.CheckWalls then
+                -- Если включен чекволлс, берем только если видимая цель
+                if target and IsTargetVisible(target) then
+                    AimTarget = target
+                    CurrentTargetDist = dist
+                else
+                    AimTarget = nil
+                    CurrentTargetDist = math.huge
+                end
+            else
+                AimTarget = target
+                CurrentTargetDist = dist
+            end
         end
     end)
 
@@ -699,7 +712,6 @@ function RunAimbot()
             Pressed = false
             AimTarget = nil
             CurrentTargetDist = math.huge
-            targetLostSince = 0
         end
     end)
 
@@ -712,50 +724,70 @@ function RunAimbot()
 
         if Pressed then
             local validTarget = AimTarget and AimTarget.Character and AimTarget.Character:FindFirstChild("Humanoid") 
-                and AimTarget.Character.Humanoid.Health > 0 and IsTargetVisible(AimTarget)
+                and AimTarget.Character.Humanoid.Health > 0
 
-            if not validTarget then
-                AimTarget, CurrentTargetDist = GetClosestTarget()
-                targetLostSince = 0
+            -- Если чекволлс врубаем, проверяем видимость текущей цели
+            if SectionSettings.AimBot.CheckWalls then
+                validTarget = validTarget and IsTargetVisible(AimTarget)
             else
-                local hrp = AimTarget.Character.HumanoidRootPart
-                local mousePos = game.UserInputService:GetMouseLocation()
-                local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                -- если чекволлс выключен — не проверяем
+                validTarget = validTarget
+            end
 
-                if onScreen then
-                    local distScreen = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-                    if distScreen > SectionSettings.AimBot.DrawSize then
-                        targetLostSince = targetLostSince + dt
-                        if targetLostSince >= TargetLostTimeout then
-                            AimTarget = nil
-                            CurrentTargetDist = math.huge
-                            targetLostSince = 0
+            -- Если текущая цель не валидна, сбрасываем
+            if not validTarget then
+                AimTarget = nil
+                CurrentTargetDist = math.huge
+
+                -- Попытаемся найти новую цель (НО если чекволлс — только видимую)
+                local newTarget, newDist = GetClosestTarget()
+                if newTarget then
+                    if SectionSettings.AimBot.CheckWalls then
+                        if IsTargetVisible(newTarget) then
+                            AimTarget = newTarget
+                            CurrentTargetDist = newDist
                         end
                     else
-                        targetLostSince = 0
+                        AimTarget = newTarget
+                        CurrentTargetDist = newDist
+                    end
+                end
+            else
+                -- Цель валидна, можно переключать на более близкую
+                local newTarget, newDist = GetClosestTarget()
+                if newTarget and newTarget ~= AimTarget and newDist < CurrentTargetDist then
+                    if SectionSettings.AimBot.CheckWalls then
+                        if IsTargetVisible(newTarget) then
+                            AimTarget = newTarget
+                            CurrentTargetDist = newDist
+                        end
+                    else
+                        AimTarget = newTarget
+                        CurrentTargetDist = newDist
+                    end
+                end
+            end
+
+            -- Проверка на экран (чтобы не смотрел в никуда)
+            if AimTarget then
+                local hrp = AimTarget.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local _, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                    if not onScreen then
+                        AimTarget = nil
+                        CurrentTargetDist = math.huge
                     end
                 else
                     AimTarget = nil
                     CurrentTargetDist = math.huge
-                    targetLostSince = 0
-                end
-
-                -- Переключаем цель ТОЛЬКО если новая лучше и в пределах круга
-                if AimTarget then
-                    local newTarget, newDist = GetClosestTarget()
-                    if newTarget ~= AimTarget and newDist < CurrentTargetDist then
-                        AimTarget = newTarget
-                        CurrentTargetDist = newDist
-                        targetLostSince = 0
-                    end
                 end
             end
         else
             AimTarget = nil
             CurrentTargetDist = math.huge
-            targetLostSince = 0
         end
 
+        -- Наводим камеру, если есть цель и можно использовать
         if Pressed and AimTarget and AimTarget.Character then
             local Humanoid = AimTarget.Character:FindFirstChild("Humanoid")
             if Humanoid and Humanoid.Health > 0 and CanUsing then
@@ -775,6 +807,7 @@ function RunAimbot()
             end
         end
 
+        -- Отрисовка круга аима
         if SectionSettings.AimBot.Draw then
             if not AimbotCircle then
                 AimbotCircle = Drawing.new("Circle")
@@ -783,6 +816,7 @@ function RunAimbot()
                 AimbotCircle.Radius = SectionSettings.AimBot.DrawSize
                 AimbotCircle.Filled = false
                 AimbotCircle.Visible = true
+
                 if not AimbotCirclePos then
                     AimbotCirclePos = game:GetService("RunService").Heartbeat:Connect(function()
                         local mousePos = game.UserInputService:GetMouseLocation()
