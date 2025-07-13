@@ -10836,7 +10836,7 @@ MiscRight3:AddToggle('ChatToggle', {
 })
 
 MiscRight3:AddToggle('DisableParts', {
-    Text = "NoBarries",
+    Text = "NoBarriers",
     Default = false,
     Callback = function(State)
         findAndDisableParts(not State)
