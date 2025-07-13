@@ -8362,7 +8362,7 @@ MiscRight:AddToggle('AutoKnockDoorsToggle', {
 AutoDepositToggle = false
 
 MiscRight:AddToggle('AutoDeposit', {
-    Text = "Auto Deposit All",
+    Text = "AutoDeposit All",
     Default = false,
     Callback = function(Value)
         AutoDepositToggle = Value
