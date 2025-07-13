@@ -1,22 +1,3 @@
-if identifyexecutor and typeof(identifyexecutor) == "function" then
-    local executor = identifyexecutor()
-    if typeof(executor) == "string" then
-        local blockedExecutors = {
-            "velocity", "jjsploit", "xeno", "mobile", "solara", "luna"
-        }
-
-        local lowered = executor:lower()
-        for _, bad in ipairs(blockedExecutors) do
-            if lowered:find(bad) then
-                game.Players.LocalPlayer:Kick("Your executor is not supported!")
-                return
-            end
-        end
-
-        print("✅ Verification passed. Your executor: " .. executor .. " is supported.\n")
-    end
-end
-
 for _, value in next, getgc(true) do 
     if typeof(value) == 'table' then
         if rawget(value, "indexInstance") or rawget(value, "newindexInstance") or rawget(value, "newIndexInstance") then 
