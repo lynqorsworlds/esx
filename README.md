@@ -8359,6 +8359,33 @@ MiscRight:AddToggle('AutoKnockDoorsToggle', {
     end
 })
 
+AutoDepositToggle = false
+
+MiscRight:AddToggle('AutoDeposit', {
+    Text = "Auto Deposit All",
+    Default = false,
+    Callback = function(Value)
+        AutoDepositToggle = Value
+    end
+})
+
+spawn(function()
+    while true do
+        if AutoDepositToggle then
+            for _, v in pairs(workspace.Map.ATMz:GetChildren()) do
+                if v.MainPart and (game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position - v.MainPart.Position).Magnitude <= 15 then
+                    cash = game:GetService("ReplicatedStorage").PlayerbaseData2[game:GetService("Players").LocalPlayer.Name].Cash.Value
+                    if cash > 0 then
+                        game:GetService("ReplicatedStorage").Events.ATM:InvokeServer("DP", cash, v.MainPart)
+                    end
+                    break
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
 GetDoor = function(dist)
     mapFolder = workspace:FindFirstChild("Map")
     if not mapFolder then return nil end
