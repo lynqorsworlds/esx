@@ -1024,7 +1024,7 @@ CombatLeft2:AddSlider('SilentAimFOV', {
     Text = 'FOV',
     Default = 50,
     Min = 10,
-    Max = 150,
+    Max = 250,
     Rounding = 0,
     Callback = function(Value)
         SectionSettings.SilentAim.DrawSize = Value
@@ -1800,11 +1800,11 @@ CombatLeft5:AddToggle('AutoBlock', {
         end
     end
 }):AddKeyPicker('AutoBlockKey', {
-    Default = 'None', -- можешь заменить на любую клавишу
-    SyncToggleState = true, -- синхронизация с Toggle
-    Mode = 'Toggle', -- или 'Hold', если хочешь зажать
+    Default = 'None', 
+    SyncToggleState = true, 
+    Mode = 'Toggle', 
     Text = 'AutoBlock Key',
-    Callback = function() end -- не нужен, всё делает SyncToggleState
+    Callback = function() end 
 })
 
 local UserInputService = game:GetService("UserInputService")
@@ -1815,50 +1815,31 @@ local LocalPlayer = Players.LocalPlayer
 local hvkillauraEnabled = false
 local remote4 = nil
 local isPlayerAlive = false
+local HeatAuraRadius = 10 
 
-CombatLeft5:AddToggle('HeatAura', {
-	Text = "Heat Vision Aura",
-	Default = false,
-	Tooltip = "Automatically destroys enemy head with laser (NEEDS HEAT VISION TOOL EQUIPPED)",
-	Callback = function(state)
-		hvkillauraEnabled = state
+local function disableHvKillaura()
+	if not remote4 then return end
+	pcall(function()
+		remote4:InvokeServer("ToggleEyes", false)
+	end)
+	pcall(function()
+		remote4:InvokeServer("ToggleLaser", false, false)
+	end)
+end
 
-		if state then
-			remote4 = hasCompoundXVision()
-			if not remote4 then
-				hvkillauraEnabled = false
-				return
-			end
-			checkPlayerAlive()
-			pcall(function()
-				remote4:InvokeServer("ToggleEyes", true)
-			end)
-			pcall(function()
-				remote4:InvokeServer("ToggleLaser", true, {
-					Normal = Vector3.new(0, 1, 0),
-					Material = Enum.Material.Air,
-					RayLength = 0,
-					Position = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0, 0, 0)
-				}, {}, 0.1)
-			end)
-		else
-			disableHvKillaura()
-		end
-	end
-}):AddKeyPicker('HeatAuraKey', {
-	Default = 'None',
-	SyncToggleState = true,
-	Mode = 'Toggle',
-	Text = 'Heat Vision Aura Key'
-})
-
--- остальная логика
 local function hasCompoundXVision()
 	local character = LocalPlayer.Character
 	local success, result = pcall(function()
 		return character and character:FindFirstChild("_CompoundXVision") and character._CompoundXVision:FindFirstChild("RemoteFunction")
 	end)
 	return success and result or nil
+end
+
+local function checkPlayerAlive()
+	local character = LocalPlayer.Character
+	local humanoid = character and character:FindFirstChild("Humanoid")
+	isPlayerAlive = character and humanoid and humanoid.Health > 0
+	return isPlayerAlive
 end
 
 local function getAllTargets()
@@ -1868,7 +1849,11 @@ local function getAllTargets()
 
 	for _, character in ipairs(Workspace.Characters:GetChildren()) do
 		if character.Name ~= localCharacterName and character:FindFirstChild("Head") and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-			table.insert(targets, character)
+			-- фильтр по радиусу
+			local rootPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0,0,0)
+			if (character.Head.Position - rootPos).Magnitude <= HeatAuraRadius then
+				table.insert(targets, character)
+			end
 		end
 	end
 	return targets
@@ -1901,7 +1886,8 @@ local function fireHvKillaura(targets)
 				if not success then allSuccess = false; return end
 
 				success = pcall(function()
-					local direction = (position - (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or position)).Unit
+					local rootPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or position
+					local direction = (position - rootPos).Unit
 					remote4:InvokeServer("Hit", 100, head, position, direction, Enum.Material.Plastic)
 				end)
 				if not success then allSuccess = false end
@@ -1916,24 +1902,52 @@ local function fireHvKillaura(targets)
 	return allSuccess
 end
 
-local function disableHvKillaura()
-	if not remote4 then return end
-	pcall(function()
-		remote4:InvokeServer("ToggleEyes", false)
-	end)
-	pcall(function()
-		remote4:InvokeServer("ToggleLaser", false, false)
-	end)
-end
+CombatLeft5:AddToggle('HeatAura', {
+	Text = "Heat Vision Aura",
+	Default = false,
+	Tooltip = "NEEDS HEAT VISION TOOL EQUIPPED - Blows up all peoples head at radius",
+	Callback = function(state)
+		hvkillauraEnabled = state
 
-local function checkPlayerAlive()
-	local character = LocalPlayer.Character
-	local humanoid = character and character:FindFirstChild("Humanoid")
-	isPlayerAlive = character and humanoid and humanoid.Health > 0
-	return isPlayerAlive
-end
+		if state then
+			remote4 = hasCompoundXVision()
+			if not remote4 then
+				hvkillauraEnabled = false
+				return
+			end
+			checkPlayerAlive()
+			pcall(function()
+				remote4:InvokeServer("ToggleEyes", true)
+			end)
+			pcall(function()
+				remote4:InvokeServer("ToggleLaser", true, {
+					Normal = Vector3.new(0, 1, 0),
+					Material = Enum.Material.Air,
+					RayLength = HeatAuraRadius,
+					Position = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0, 0, 0)
+				}, {}, 0.1)
+			end)
+		else
+			disableHvKillaura()
+		end
+	end
+}):AddKeyPicker('HeatAuraKey', {
+	Default = 'None',
+	SyncToggleState = true,
+	Mode = 'Toggle',
+	Text = 'Heat Vision Aura Key'
+})
 
-remote4 = hasCompoundXVision()
+CombatLeft5:AddSlider('HeatAuraRadiusSlider', {
+    Text = "Heat Vision Radius",
+    Default = HeatAuraRadius,
+    Min = 10,
+    Max = 125,
+    Rounding = 0,
+    Callback = function(value)
+        HeatAuraRadius = value
+    end
+})
 
 LocalPlayer.CharacterAdded:Connect(function()
 	isPlayerAlive = true
@@ -1947,7 +1961,7 @@ LocalPlayer.CharacterAdded:Connect(function()
 				remote4:InvokeServer("ToggleLaser", true, {
 					Normal = Vector3.new(0, 1, 0),
 					Material = Enum.Material.Air,
-					RayLength = 0,
+					RayLength = HeatAuraRadius,
 					Position = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0, 0, 0)
 				}, {}, 0.1)
 			end)
@@ -1970,7 +1984,6 @@ end)
 
 checkPlayerAlive()
 
--- 🔥 основной цикл
 spawn(function()
 	while true do
 		if hvkillauraEnabled then
@@ -1979,15 +1992,15 @@ spawn(function()
 				local targets = getAllTargets()
 				if #targets > 0 then
 					fireHvKillaura(targets)
-					wait(0.01)
+					wait(0.02) 
 				else
-					wait(0.2)
+					wait(0.3) 
 				end
 			else
-				wait(0.5)
+				wait(0.4)    
 			end
 		else
-			wait(0.5)
+			wait(0.5)   
 		end
 	end
 end)
@@ -11098,7 +11111,7 @@ MenuGroup = Tabs.Settings:AddLeftGroupbox('Menu')
 --MenuGroup:AddToggle('MouseVisibilityToggle', {
 --    Text = 'Show Mouse',
 --    Default = true,
---    Callback = function(Value)
+--    Callback = function(Value) 
 --        MouseEnabled = Value
 --    end
 --})
