@@ -634,28 +634,31 @@ function IsTargetVisible(player)
     return cache.visible
 end
 
-function GetClosestTarget(oldTarget)
+function GetClosestTarget()
     local camera = workspace.CurrentCamera
     local localPlayer = game.Players.LocalPlayer
     local mousePos = game.UserInputService:GetMouseLocation()
     local closest = nil
-    local closestDist = SectionSettings.AimBot.DrawSize or 100 -- только цели внутри круга
+    local closestDist = SectionSettings.AimBot.DrawSize or 100
 
-    for _, player in pairs(game.Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            if SectionSettings.AimBot.CheckTeam and player.Team == localPlayer.Team then continue end
-            if SectionSettings.AimBot.CheckWhitelist and GlobalWhiteList and GlobalWhiteList[player.Name] then continue end
-            if not IsTargetVisible(player) then continue end
+    local players = game.Players:GetPlayers()
+    for i = 1, #players do
+        local player = players[i]
+        if player ~= localPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if SectionSettings.AimBot.CheckTeam and player.Team == localPlayer.Team then continue end
+                if SectionSettings.AimBot.CheckWhitelist and GlobalWhiteList and GlobalWhiteList[player.Name] then continue end
+                if not IsTargetVisible(player) then continue end
 
-            local hrp = player.Character.HumanoidRootPart
-            local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-            if not onScreen then continue end
+                local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if not onScreen then continue end
 
-            local distScreen = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-
-            if distScreen <= closestDist then
-                closestDist = distScreen
-                closest = player
+                local distScreen = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+                if distScreen < closestDist then
+                    closest = player
+                    closestDist = distScreen
+                end
             end
         end
     end
@@ -667,94 +670,69 @@ function RunAimbot()
     local Pressed = false
     local AimTarget = nil
     local CurrentTargetDist = math.huge
+    local UIS = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local Camera = workspace.CurrentCamera
 
-    game.UserInputService.InputBegan:Connect(function(input)
-        if not game.UserInputService:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
+    UIS.InputBegan:Connect(function(input)
+        if not UIS:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
             Pressed = true
-            -- При первом нажатии пробуем получить цель
+
             local target, dist = GetClosestTarget()
-            if SectionSettings.AimBot.CheckWalls then
-                -- Если включен чекволлс, берем только если видимая цель
-                if target and IsTargetVisible(target) then
-                    AimTarget = target
-                    CurrentTargetDist = dist
-                else
-                    AimTarget = nil
-                    CurrentTargetDist = math.huge
-                end
+            if SectionSettings.AimBot.CheckWalls and (not target or not IsTargetVisible(target)) then
+                AimTarget, CurrentTargetDist = nil, math.huge
             else
-                AimTarget = target
-                CurrentTargetDist = dist
+                AimTarget, CurrentTargetDist = target, dist
             end
         end
     end)
 
-    game.UserInputService.InputEnded:Connect(function(input)
-        if not game.UserInputService:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
+    UIS.InputEnded:Connect(function(input)
+        if not UIS:GetFocusedTextBox() and input.UserInputType == Enum.UserInputType.MouseButton2 then
             Pressed = false
             AimTarget = nil
             CurrentTargetDist = math.huge
         end
     end)
 
-    game:GetService("RunService").RenderStepped:Connect(function(dt)
+    RunService.RenderStepped:Connect(function()
         if not AimbotEnabled then return end
 
-        local camera = workspace.CurrentCamera
-        local Magnitude = (camera.Focus.p - camera.CFrame.p).Magnitude
+        local Magnitude = (Camera.Focus.Position - Camera.CFrame.Position).Magnitude
         local CanUsing = Magnitude <= 1.5
 
         if Pressed then
-            local validTarget = AimTarget and AimTarget.Character and AimTarget.Character:FindFirstChild("Humanoid") 
-                and AimTarget.Character.Humanoid.Health > 0
-
-            -- Если чекволлс врубаем, проверяем видимость текущей цели
-            if SectionSettings.AimBot.CheckWalls then
-                validTarget = validTarget and IsTargetVisible(AimTarget)
-            else
-                -- если чекволлс выключен — не проверяем
-                validTarget = validTarget
+            local validTarget = AimTarget and AimTarget.Character
+            if validTarget then
+                local Humanoid = AimTarget.Character:FindFirstChild("Humanoid")
+                validTarget = Humanoid and Humanoid.Health > 0
             end
 
-            -- Если текущая цель не валидна, сбрасываем
+            if SectionSettings.AimBot.CheckWalls then
+                validTarget = validTarget and IsTargetVisible(AimTarget)
+            end
+
             if not validTarget then
                 AimTarget = nil
                 CurrentTargetDist = math.huge
 
-                -- Попытаемся найти новую цель (НО если чекволлс — только видимую)
                 local newTarget, newDist = GetClosestTarget()
-                if newTarget then
-                    if SectionSettings.AimBot.CheckWalls then
-                        if IsTargetVisible(newTarget) then
-                            AimTarget = newTarget
-                            CurrentTargetDist = newDist
-                        end
-                    else
-                        AimTarget = newTarget
-                        CurrentTargetDist = newDist
-                    end
+                if newTarget and (not SectionSettings.AimBot.CheckWalls or IsTargetVisible(newTarget)) then
+                    AimTarget, CurrentTargetDist = newTarget, newDist
                 end
             else
-                -- Цель валидна, можно переключать на более близкую
                 local newTarget, newDist = GetClosestTarget()
                 if newTarget and newTarget ~= AimTarget and newDist < CurrentTargetDist then
-                    if SectionSettings.AimBot.CheckWalls then
-                        if IsTargetVisible(newTarget) then
-                            AimTarget = newTarget
-                            CurrentTargetDist = newDist
-                        end
-                    else
-                        AimTarget = newTarget
-                        CurrentTargetDist = newDist
+                    if not SectionSettings.AimBot.CheckWalls or IsTargetVisible(newTarget) then
+                        AimTarget, CurrentTargetDist = newTarget, newDist
                     end
                 end
             end
 
-            -- Проверка на экран (чтобы не смотрел в никуда)
             if AimTarget then
                 local hrp = AimTarget.Character:FindFirstChild("HumanoidRootPart")
                 if hrp then
-                    local _, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                    local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                     if not onScreen then
                         AimTarget = nil
                         CurrentTargetDist = math.huge
@@ -769,27 +747,25 @@ function RunAimbot()
             CurrentTargetDist = math.huge
         end
 
-        -- Наводим камеру, если есть цель и можно использовать
-        if Pressed and AimTarget and AimTarget.Character then
+        if Pressed and AimTarget and AimTarget.Character and CanUsing then
             local Humanoid = AimTarget.Character:FindFirstChild("Humanoid")
-            if Humanoid and Humanoid.Health > 0 and CanUsing then
+            if Humanoid and Humanoid.Health > 0 then
                 local PartName = SectionSettings.AimBot.TargetPart or "HumanoidRootPart"
                 local TargetPart = AimTarget.Character:FindFirstChild(PartName)
                 if TargetPart then
                     local TargetPosition = TargetPart.Position
                     if SectionSettings.AimBot.Velocity then
-                        TargetPosition = TargetPosition + (TargetPart.Velocity or Vector3.new()) / Predict
+                        TargetPosition = TargetPosition + (TargetPart.Velocity or Vector3.zero) / Predict
                     end
                     if SectionSettings.AimBot.Smooth then
-                        camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.p, TargetPosition), SectionSettings.AimBot.SmoothSize)
+                        Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, TargetPosition), SectionSettings.AimBot.SmoothSize)
                     else
-                        camera.CFrame = CFrame.new(camera.CFrame.Position, TargetPosition)
+                        Camera.CFrame = CFrame.new(Camera.CFrame.Position, TargetPosition)
                     end
                 end
             end
         end
 
-        -- Отрисовка круга аима
         if SectionSettings.AimBot.Draw then
             if not AimbotCircle then
                 AimbotCircle = Drawing.new("Circle")
@@ -800,8 +776,8 @@ function RunAimbot()
                 AimbotCircle.Visible = true
 
                 if not AimbotCirclePos then
-                    AimbotCirclePos = game:GetService("RunService").Heartbeat:Connect(function()
-                        local mousePos = game.UserInputService:GetMouseLocation()
+                    AimbotCirclePos = RunService.Heartbeat:Connect(function()
+                        local mousePos = UIS:GetMouseLocation()
                         AimbotCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
                     end)
                 end
@@ -2045,51 +2021,66 @@ spawn(function()
 end)
 
 instantreloadL = function()
-    gunR_remote = game:GetService("ReplicatedStorage").Events["GNX_R"]
-    connections = {}
-    
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local LocalPlayer = Players.LocalPlayer
+    local gunR_remote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("GNX_R")
+    local INSTANT_KEY = "KLWE89U0"
+
+    local connections = {}
+    local toolConn, charConn
+
+    cleanupConnections = function()
+        for _, conn in ipairs(connections) do
+            if conn.Connected then
+                conn:Disconnect()
+            end
+        end
+        connections = {}
+        if toolConn and toolConn.Connected then
+            toolConn:Disconnect()
+            toolConn = nil
+        end
+    end
+
     setupTool = function(tool)
         if not tool or not tool:FindFirstChild("IsGun") then return end
-        values = tool:FindFirstChild("Values")
+
+        local values = tool:FindFirstChild("Values")
         if not values then return end
-        serverAmmo = values:FindFirstChild("SERVER_Ammo")
-        storedAmmo = values:FindFirstChild("SERVER_StoredAmmo")
-        
+
+        local serverAmmo = values:FindFirstChild("SERVER_Ammo")
+        local storedAmmo = values:FindFirstChild("SERVER_StoredAmmo")
+
         if storedAmmo then
-            conn1 = storedAmmo:GetPropertyChangedSignal("Value"):Connect(function()
+            local conn1 = storedAmmo:GetPropertyChangedSignal("Value"):Connect(function()
                 if functions.instant_reloadF and storedAmmo.Value ~= 0 then
-                    gunR_remote:FireServer(tick(), "KLWE89U0", tool)
+                    gunR_remote:FireServer(tick(), INSTANT_KEY, tool)
                 end
             end)
             table.insert(connections, conn1)
+
             if storedAmmo.Value ~= 0 and functions.instant_reloadF then
-                gunR_remote:FireServer(tick(), "KLWE89U0", tool)
+                gunR_remote:FireServer(tick(), INSTANT_KEY, tool)
             end
         end
-        
+
         if serverAmmo then
-            conn2 = serverAmmo:GetPropertyChangedSignal("Value"):Connect(function()
+            local conn2 = serverAmmo:GetPropertyChangedSignal("Value"):Connect(function()
                 if functions.instant_reloadF and storedAmmo and storedAmmo.Value ~= 0 then
-                    gunR_remote:FireServer(tick(), "KLWE89U0", tool)
+                    gunR_remote:FireServer(tick(), INSTANT_KEY, tool)
                 end
             end)
             table.insert(connections, conn2)
         end
     end
 
-    cleanupConnections = function()
-        for _, conn in pairs(connections) do
-            if conn.Connected then
-                conn:Disconnect()
-            end
-        end
-        connections = {}
-    end
-
     setupCharacter = function(char)
         cleanupConnections()
         setupTool(char:FindFirstChildOfClass("Tool"))
-        if toolConn then
+
+        if toolConn and toolConn.Connected then
             toolConn:Disconnect()
         end
         toolConn = char.ChildAdded:Connect(function(obj)
@@ -2099,23 +2090,23 @@ instantreloadL = function()
         end)
     end
 
-    if game:GetService("Players").LocalPlayer.Character then
-        setupCharacter(game:GetService("Players").LocalPlayer.Character)
+    if LocalPlayer.Character then
+        setupCharacter(LocalPlayer.Character)
     end
 
-    if charConn then
+    if charConn and charConn.Connected then
         charConn:Disconnect()
     end
-    charConn = game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(char)
+    charConn = LocalPlayer.CharacterAdded:Connect(function(char)
         setupCharacter(char)
     end)
 
     while functions.instant_reloadF do
-        wait(0.1)
+        task.wait(0.1)
     end
+
     cleanupConnections()
-    if charConn then charConn:Disconnect() end
-    if toolConn then toolConn:Disconnect() end
+    if charConn and charConn.Connected then charConn:Disconnect() end
 end
 
 local lastScanTime = 0
