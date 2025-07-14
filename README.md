@@ -98,7 +98,8 @@ remote1 = game:GetService("ReplicatedStorage").Events["XMHH.2"]
 remote2 = game:GetService("ReplicatedStorage").Events["XMHH2.2"]
 
 CombatLeft = Tabs.Combat:AddLeftGroupbox('Whitelist & Target')
-CombatLeft5 = Tabs.Combat:AddLeftGroupbox('Cool functions')
+CombatLeft5 = Tabs.Combat:AddLeftGroupbox('Heat Vision')
+CombatLeft6 = Tabs.Combat:AddLeftGroupbox('Blocking')
 CombatLeft1 = Tabs.Combat:AddLeftGroupbox('MeleeAura')
 CombatRight4 = Tabs.Combat:AddRightGroupbox('MeleeReach')
 CombatRight = Tabs.Combat:AddRightGroupbox('Aimbot')
@@ -1788,7 +1789,7 @@ local function stopAutoblock()
     end
 end
 
-CombatLeft5:AddToggle('AutoBlock', {
+CombatLeft6:AddToggle('AutoBlock', {
     Text = "Auto Block",
     Default = false,
     Tooltip = "Automatically block melee attacks (DONT WORK WITH MELEE AURA)",
@@ -1815,7 +1816,8 @@ local LocalPlayer = Players.LocalPlayer
 local hvkillauraEnabled = false
 local remote4 = nil
 local isPlayerAlive = false
-local HeatAuraRadius = 10 
+local HeatAuraRadius = 10
+local HeatAuraMode = "Single"
 
 local function disableHvKillaura()
 	if not remote4 then return end
@@ -1849,14 +1851,23 @@ local function getAllTargets()
 
 	for _, character in ipairs(Workspace.Characters:GetChildren()) do
 		if character.Name ~= localCharacterName and character:FindFirstChild("Head") and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-			-- фильтр по радиусу
 			local rootPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new(0,0,0)
 			if (character.Head.Position - rootPos).Magnitude <= HeatAuraRadius then
 				table.insert(targets, character)
 			end
 		end
 	end
-	return targets
+
+	if HeatAuraMode == "Single" then
+		return targets[1] and { targets[1] } or {}
+	elseif HeatAuraMode == "Multi" then
+		local limited = {}
+		for i = 1, math.min(10, #targets) do
+			table.insert(limited, targets[i])
+		end
+		return limited
+	end
+	return {}
 end
 
 local function fireHvKillaura(targets)
@@ -1931,11 +1942,21 @@ CombatLeft5:AddToggle('HeatAura', {
 			disableHvKillaura()
 		end
 	end
-}):AddKeyPicker('HeatAuraKey', {
+})
+:AddKeyPicker('HeatAuraKey', {
 	Default = 'None',
 	SyncToggleState = true,
 	Mode = 'Toggle',
 	Text = 'Heat Vision Aura Key'
+})
+
+CombatLeft5:AddDropdown('HeatAuraModeDropdown', {
+	Values = { 'Single', 'Multi' },
+	Default = 1,
+	Text = 'Heat Aura Mode',
+	Callback = function(value)
+		HeatAuraMode = value
+	end
 })
 
 CombatLeft5:AddSlider('HeatAuraRadiusSlider', {
@@ -1992,15 +2013,15 @@ spawn(function()
 				local targets = getAllTargets()
 				if #targets > 0 then
 					fireHvKillaura(targets)
-					wait(0.02) 
+					wait(0.02)
 				else
-					wait(0.3) 
+					wait(0.3)
 				end
 			else
-				wait(0.4)    
+				wait(0.4)
 			end
 		else
-			wait(0.5)   
+			wait(0.5)
 		end
 	end
 end)
