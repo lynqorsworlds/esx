@@ -1,11 +1,3 @@
-for _, value in next, getgc(true) do 
-    if typeof(value) == 'table' then
-        if rawget(value, "indexInstance") or rawget(value, "newindexInstance") or rawget(value, "newIndexInstance") then 
-            value.tvk = {"kick", function() return task.wait(9e9) end} 
-        end
-    end
-end
-
 local repo = 'https://raw.githubusercontent.com/yourmakerqkeso/EverloseLib/main/'
 
 Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
@@ -896,6 +888,7 @@ CombatLeft2:AddToggle('SilentAimToggle', {
     Callback = function(Value)
         functions.silentaimF = Value
         UpdateCircle()
+
         if not Value then
             currentTarget = nil
             if remotes.SilentAimTask then
@@ -907,56 +900,80 @@ CombatLeft2:AddToggle('SilentAimToggle', {
                 visualizeConnection = nil
             end
             UpdateHighlightSilent(nil)
-        else
-            VisualizeEvent = game:GetService("ReplicatedStorage").Events2.Visualize
-            DamageEvent = game:GetService("ReplicatedStorage").Events["ZFKLF__H"]
-            remotes.SilentAimTask = task.spawn(function()
-                while functions.silentaimF do
-                    currentTarget = UrTargetFunc()
-                    task.wait(0.1)
+            return
+        end
+
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local Players = game:GetService("Players")
+        local Camera = workspace.CurrentCamera
+        local LocalPlayer = Players.LocalPlayer
+
+        VisualizeEvent = ReplicatedStorage:WaitForChild("Events2"):WaitForChild("Visualize")
+        DamageEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ZFKLF__H")
+
+        remotes.SilentAimTask = task.spawn(function()
+            while functions.silentaimF do
+                local nextTarget = UrTargetFunc()
+                if currentTarget ~= nextTarget then
+                    currentTarget = nextTarget
+                    UpdateHighlightSilent(currentTarget)
                 end
-            end)
-            visualizeConnection = VisualizeEvent.Event:Connect(function(_, ShotCode, _, Gun, _, StartPos, BulletsPerShot)
-                if not functions.silentaimF or not Gun or not currentTarget or not currentTarget.Character or currentTarget.Character:FindFirstChildOfClass("ForceField") then return end
-                playerTool = game:GetService("Players").LocalPlayer.Character and game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if not playerTool or Gun ~= playerTool then return end
-                HitPart = nil
-                if SectionSettings.SilentAim.TargetPart == "Closest" then
-                    minPartDistance = math.huge
-                    for _, partName in ipairs(ValidSilentTargetParts) do
-                        part = currentTarget.Character:FindFirstChild(partName)
-                        if part then
-                            screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(part.Position)
-                            if onScreen then
-                                distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                                if distance < minPartDistance then
-                                    minPartDistance = distance
-                                    HitPart = part
-                                end
+                task.wait(0.1)
+            end
+        end)
+
+        visualizeConnection = VisualizeEvent.Event:Connect(function(_, ShotCode, _, Gun, _, StartPos, BulletsPerShot)
+            if not (functions.silentaimF and Gun and currentTarget and currentTarget.Character) then return end
+            if currentTarget.Character:FindFirstChildOfClass("ForceField") then return end
+
+            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if not tool or Gun ~= tool then return end
+
+            local HitPart
+            local targetPartSetting = SectionSettings.SilentAim.TargetPart
+
+            if targetPartSetting == "Closest" then
+                local minDist = math.huge
+                for _, partName in ipairs(ValidSilentTargetParts) do
+                    local part = currentTarget.Character:FindFirstChild(partName)
+                    if part then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                        if onScreen then
+                            local dist = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                            if dist < minDist then
+                                minDist = dist
+                                HitPart = part
                             end
                         end
                     end
-                else
-                    HitPart = SectionSettings.SilentAim.TargetPart == "Random" and currentTarget.Character:FindFirstChild(ValidSilentTargetParts[math.random(1, #ValidSilentTargetParts)]) or currentTarget.Character:FindFirstChild(SectionSettings.SilentAim.TargetPart or "Head")
                 end
-                if not HitPart then return end
-                HitPos = HitPart.Position
-                Bullets = {}
-                for i = 1, math.clamp(#BulletsPerShot, 1, 100) do
-                    table.insert(Bullets, CFrame.new(StartPos, HitPos).LookVector)
+            else
+                local partName = targetPartSetting == "Random"
+                    and ValidSilentTargetParts[math.random(1, #ValidSilentTargetParts)]
+                    or targetPartSetting or "Head"
+                HitPart = currentTarget.Character:FindFirstChild(partName)
+            end
+
+            if not HitPart then return end
+
+            local HitPos = HitPart.Position
+            local bulletCount = math.clamp(#BulletsPerShot, 1, 100)
+            local lookVector = CFrame.new(StartPos, HitPos).LookVector
+            local Bullets = table.create(bulletCount, lookVector)
+
+            task.wait() -- буфер кадра
+
+            for i = 1, bulletCount do
+                DamageEvent:FireServer("🧈", Gun, ShotCode, i, HitPart, HitPos, Bullets[i])
+            end
+
+            if Gun:FindFirstChild("Hitmarker") then
+                Gun.Hitmarker:Fire(HitPart)
+                if HitPart.Name == "Head" then
+                    PlayHeadshotSound()
                 end
-                task.wait(0.005)
-                for Index, LookVector in ipairs(Bullets) do
-                    DamageEvent:FireServer("🧈", Gun, ShotCode, Index, HitPart, HitPos, LookVector)
-                end
-                if Gun:FindFirstChild("Hitmarker") then
-                    Gun.Hitmarker:Fire(HitPart)
-                    if HitPart.Name == "Head" then
-                        PlayHeadshotSound()
-                    end
-                end
-            end)
-        end
+            end
+        end)
     end
 }):AddKeyPicker('SilentAimKey', {
     Default = 'None',
@@ -1053,6 +1070,7 @@ CombatLeft2:AddDropdown('SilentAimTargetPart', {
         SectionSettings.SilentAim.TargetPart = Value
     end
 })
+
 
 RagebotF = false
 me = game.Players.LocalPlayer
