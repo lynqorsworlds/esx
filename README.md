@@ -31,6 +31,36 @@ tween = game:GetService("TweenService")
 functions = {}
 remotes = {}
 
+-- 🧹 Runtime AutoCleaner — вставлен сюда
+if not shared._RuntimeCleanerStarted then
+    shared._RuntimeCleanerStarted = true
+    shared._RuntimeGarbage = {}
+
+    function shared._TrackRuntime(obj)
+        table.insert(shared._RuntimeGarbage, obj)
+        return obj
+    end
+
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            for i, v in ipairs(shared._RuntimeGarbage) do
+                local ok, err = pcall(function()
+                    if typeof(v) == "RBXScriptConnection" and v.Connected then
+                        v:Disconnect()
+                    elseif typeof(v) == "thread" and coroutine.status(v) ~= "dead" then
+                        coroutine.close(v)
+                    elseif typeof(v) == "Instance" and v.Destroy then
+                        v:Destroy()
+                    end
+                end)
+                shared._RuntimeGarbage[i] = nil
+            end
+        end
+    end)
+end
+
+-- 👇 Твой дальнейший код продолжается как есть:
 SectionSettings = {
     SilentAim = {
         DrawSize = 50,
@@ -80,7 +110,6 @@ SectionSettings = {
         CheckWhitelist = false
     }
 }
-
 
 ValidAimbotTargetParts = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}
 ValidSilentTargetParts = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}
@@ -3720,19 +3749,6 @@ ChamsToggle:AddColorPicker('OccludedColor', {
     end
 })
 
-HighlightsToggle = VisualsLeft:AddToggle('HighlightsToggle', {
-    Text = "Show Highlights",
-    Default = false,
-    Callback = function(Value)
-        HighlightsToggle = Value
-        for _, player in pairs(PlayerAdornments) do
-            player.Highlight.Enabled = false
-            player.Highlight.Adornee = nil
-        end
-        UpdateVisuals()
-    end
-})
-
 HighlightsToggle:AddColorPicker('FillColor', {
     Default = Color3.fromRGB(0, 0, 0),
     Title = "Fill Color",
@@ -7087,24 +7103,6 @@ AlwaysCrouchToggle = MovementRight2:AddToggle('AlwaysCrouch', {
         else
             RunService:UnbindFromRenderStep("AlwaysCrouch")
             game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.C, false, game)
-        end
-    end
-})
-
-NoStaminaEnabled = false
-
-MovementRight2:AddToggle('NoStaminaToggle', {
-    Text = 'NoStamina',
-    Default = false,
-    Callback = function(Value)
-        NoStaminaEnabled = Value
-        if Value then
-            spawn(function()
-                while NoStaminaEnabled do
-                    game:GetService("ReplicatedStorage").CharStats[game.Players.LocalPlayer.Name].Sprinting.Value = true
-                    task.wait()
-                end
-            end)
         end
     end
 })
