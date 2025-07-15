@@ -91,7 +91,6 @@ remote2 = game:GetService("ReplicatedStorage").Events["XMHH2.2"]
 
 CombatLeft = Tabs.Combat:AddLeftGroupbox('Whitelist & Target')
 CombatLeft5 = Tabs.Combat:AddLeftGroupbox('Heat Vision')
-CombatLeft6 = Tabs.Combat:AddLeftGroupbox('Blocking')
 CombatLeft1 = Tabs.Combat:AddLeftGroupbox('MeleeAura')
 CombatRight4 = Tabs.Combat:AddRightGroupbox('MeleeReach')
 CombatRight = Tabs.Combat:AddRightGroupbox('Aimbot')
@@ -858,6 +857,7 @@ function UrTargetFunc()
     return closestPlayer
 end
 
+-- Silent Aim - Мега Оптимизированный без фризов
 CombatLeft2:AddToggle('SilentAimToggle', {
     Text = 'Silent Aim',
     Default = false,
@@ -889,12 +889,12 @@ CombatLeft2:AddToggle('SilentAimToggle', {
 
         remotes.SilentAimTask = task.spawn(function()
             while functions.silentaimF do
-                local nextTarget = UrTargetFunc()
-                if currentTarget ~= nextTarget then
-                    currentTarget = nextTarget
+                local success, result = pcall(UrTargetFunc)
+                if success and currentTarget ~= result then
+                    currentTarget = result
                     UpdateHighlightSilent(currentTarget)
                 end
-                task.wait(0.1)
+                task.wait(0.25)
             end
         end)
 
@@ -906,9 +906,9 @@ CombatLeft2:AddToggle('SilentAimToggle', {
             if not tool or Gun ~= tool then return end
 
             local HitPart
-            local targetPartSetting = SectionSettings.SilentAim.TargetPart
+            local setting = SectionSettings.SilentAim.TargetPart
 
-            if targetPartSetting == "Closest" then
+            if setting == "Closest" then
                 local minDist = math.huge
                 for _, partName in ipairs(ValidSilentTargetParts) do
                     local part = currentTarget.Character:FindFirstChild(partName)
@@ -924,27 +924,26 @@ CombatLeft2:AddToggle('SilentAimToggle', {
                     end
                 end
             else
-                local partName = targetPartSetting == "Random"
-                    and ValidSilentTargetParts[math.random(1, #ValidSilentTargetParts)]
-                    or targetPartSetting or "Head"
+                local partName = setting == "Random"
+                    and ValidSilentTargetParts[math.random(#ValidSilentTargetParts)]
+                    or setting or "Head"
                 HitPart = currentTarget.Character:FindFirstChild(partName)
             end
 
             if not HitPart then return end
 
             local HitPos = HitPart.Position
-            local bulletCount = math.clamp(#BulletsPerShot, 1, 100)
-            local lookVector = CFrame.new(StartPos, HitPos).LookVector
-            local Bullets = table.create(bulletCount, lookVector)
+            local count = math.clamp(#BulletsPerShot, 1, 100)
+            local dir = CFrame.new(StartPos, HitPos).LookVector
+            local Bullets = table.create(count, dir)
 
-            task.wait() -- буфер кадра
-
-            for i = 1, bulletCount do
+            for i = 1, count do
                 DamageEvent:FireServer("🧈", Gun, ShotCode, i, HitPart, HitPos, Bullets[i])
             end
 
-            if Gun:FindFirstChild("Hitmarker") then
-                Gun.Hitmarker:Fire(HitPart)
+            local hitmarker = Gun:FindFirstChild("Hitmarker")
+            if hitmarker then
+                hitmarker:Fire(HitPart)
                 if HitPart.Name == "Head" then
                     PlayHeadshotSound()
                 end
@@ -1046,7 +1045,6 @@ CombatLeft2:AddDropdown('SilentAimTargetPart', {
         SectionSettings.SilentAim.TargetPart = Value
     end
 })
-
 
 RagebotF = false
 me = game.Players.LocalPlayer
@@ -1652,154 +1650,18 @@ safeGet = function(obj, path, default)
     return current
 end
 
+local instantReloadRunning = false
+
 CombatLeft4:AddToggle('InstantReload', {
     Text = "Instant Reload",
     Default = false,
     Tooltip = "Reloads weapon instantly",
     Callback = function(Value)
         functions.instant_reloadF = Value
-        if Value then
-            spawn(instantreloadL)
+        if Value and not instantReloadRunning then
+            task.spawn(instantreloadL)
         end
     end
-})
-
-local vim = game:GetService("VirtualInputManager")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local excludedTools = {"Balisong", "Bayonet", "BlackBayonet", "Shovel", "Chainsaw", "Fire-Axe", "Broom", "Clippers", "ERADICATOR", "ERADICATORII", "FrozenScythe", "Scythe", "GladiatorSword", "SlayerSword"}
-local localPlayerExcludedTools = {"Shovel", "Chainsaw", "Fire-Axe", "Crowbar", "CandyCrowbar", "__ZombieFists1", "__ZombieFists2", "__ZombieFists3", "__ZombieFists4", "Clippers", "Golfclub", "Bayonet", "BlackBayonet", "Balisong", "Broom", "CursedDagger", "Rambo", "Shiv", "Wrench"}
-local validAnimationNames = {"Slash1", "Slash2", "Slash3"}
-local toolAnimationCache = {}
-local isBlocking = false
-local steppedConnection -- для хранения подключения RunService
-
-local function block(condition)
-    vim:SendKeyEvent(condition, "Q", false, game)
-end
-
-local function getAnimationIdsFromAnimsFolder(character, toolName)
-    if toolAnimationCache[toolName] then
-        return toolAnimationCache[toolName]
-    end
-
-    local animIds = {}
-    local animsFolder = workspace.Characters:FindFirstChild(character.Name)
-        and workspace.Characters[character.Name]:FindFirstChild(toolName)
-        and workspace.Characters[character.Name][toolName]:FindFirstChild("AnimsFolder")
-    
-    if animsFolder then
-        for _, anim in ipairs(animsFolder:GetChildren()) do
-            if anim:IsA("Animation") and anim.AnimationId and table.find(validAnimationNames, anim.Name) then
-                table.insert(animIds, anim.AnimationId)
-            end
-        end
-    end
-    toolAnimationCache[toolName] = animIds
-    return animIds
-end
-
-local function handleBlock(toolName)
-    if not isBlocking then
-        isBlocking = true
-        block(true)
-        if toolName == "Sledgehammer" or toolName == "Metal-Bat" then
-            wait(0.8)
-        else
-            wait(0.5)
-        end
-        block(false)
-        isBlocking = false
-    end
-end
-
-local function setupAnimationTracking(player, tool, animIds)
-    local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
-    if not humanoid then return end
-
-    local connection
-    connection = humanoid.AnimationPlayed:Connect(function(animationTrack)
-        if table.find(animIds, animationTrack.Animation.AnimationId) and animationTrack.IsPlaying then
-            local localPlayer = Players.LocalPlayer
-            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local distance = (localPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                if distance < 10 then
-                    coroutine.wrap(function()
-                        handleBlock(tool.Name)
-                    end)()
-                end
-            end
-        end
-    end)
-
-    tool.AncestryChanged:Connect(function()
-        if not tool:IsDescendantOf(player.Character) then
-            connection:Disconnect()
-        end
-    end)
-    humanoid.Died:Connect(function()
-        connection:Disconnect()
-    end)
-end
-
-local function setupAutoblock()
-    steppedConnection = RunService.Stepped:Connect(function()
-        local localPlayer = Players.LocalPlayer
-        if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            return
-        end
-
-        local localTool = localPlayer.Character:FindFirstChildWhichIsA("Tool")
-        if localTool and table.find(localPlayerExcludedTools, localTool.Name) then
-            return
-        end
-
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local tool = player.Character:FindFirstChildWhichIsA("Tool")
-                if tool and not tool:FindFirstChild("IsGun") then
-                    local isSledgehammer = localTool and localTool.Name == "Sledgehammer"
-                    if (isSledgehammer and tool.Name == "Shovel") or not table.find(excludedTools, tool.Name) then
-                        local animIds = getAnimationIdsFromAnimsFolder(player.Character, tool.Name)
-                        if animIds and #animIds > 0 then
-                            setupAnimationTracking(player, tool, animIds)
-                        end
-                    end
-                end
-            end
-        end
-    end)
-end
-
-local function stopAutoblock()
-    if steppedConnection then
-        steppedConnection:Disconnect()
-        steppedConnection = nil
-    end
-    if isBlocking then
-        block(false)
-        isBlocking = false
-    end
-end
-
-CombatLeft6:AddToggle('AutoBlock', {
-    Text = "Auto Block",
-    Default = false,
-    Tooltip = "Automatically block melee attacks (DONT WORK WITH MELEE AURA)",
-    Callback = function(Value)
-        if Value then
-            setupAutoblock()
-        else
-            stopAutoblock()
-        end
-    end
-}):AddKeyPicker('AutoBlockKey', {
-    Default = 'None', 
-    SyncToggleState = true, 
-    Mode = 'Toggle', 
-    Text = 'AutoBlock Key',
-    Callback = function() end 
 })
 
 local UserInputService = game:GetService("UserInputService")
@@ -2021,6 +1883,9 @@ spawn(function()
 end)
 
 instantreloadL = function()
+    if instantReloadRunning then return end
+    instantReloadRunning = true
+
     local Players = game:GetService("Players")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -2031,20 +1896,26 @@ instantreloadL = function()
     local connections = {}
     local toolConn, charConn
 
-    cleanupConnections = function()
+    local function cleanupConnections()
         for _, conn in ipairs(connections) do
             if conn.Connected then
                 conn:Disconnect()
             end
         end
         connections = {}
+
         if toolConn and toolConn.Connected then
             toolConn:Disconnect()
             toolConn = nil
         end
+
+        if charConn and charConn.Connected then
+            charConn:Disconnect()
+            charConn = nil
+        end
     end
 
-    setupTool = function(tool)
+    local function setupTool(tool)
         if not tool or not tool:FindFirstChild("IsGun") then return end
 
         local values = tool:FindFirstChild("Values")
@@ -2076,13 +1947,10 @@ instantreloadL = function()
         end
     end
 
-    setupCharacter = function(char)
+    local function setupCharacter(char)
         cleanupConnections()
         setupTool(char:FindFirstChildOfClass("Tool"))
 
-        if toolConn and toolConn.Connected then
-            toolConn:Disconnect()
-        end
         toolConn = char.ChildAdded:Connect(function(obj)
             if obj:IsA("Tool") and obj:FindFirstChild("IsGun") then
                 setupTool(obj)
@@ -2094,19 +1962,17 @@ instantreloadL = function()
         setupCharacter(LocalPlayer.Character)
     end
 
-    if charConn and charConn.Connected then
-        charConn:Disconnect()
-    end
     charConn = LocalPlayer.CharacterAdded:Connect(function(char)
         setupCharacter(char)
     end)
 
+    -- Wait for disable
     while functions.instant_reloadF do
         task.wait(0.1)
     end
 
     cleanupConnections()
-    if charConn and charConn.Connected then charConn:Disconnect() end
+    instantReloadRunning = false
 end
 
 local lastScanTime = 0
