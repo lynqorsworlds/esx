@@ -857,7 +857,6 @@ function UrTargetFunc()
     return closestPlayer
 end
 
--- Silent Aim - Мега Оптимизированный без фризов
 CombatLeft2:AddToggle('SilentAimToggle', {
     Text = 'Silent Aim',
     Default = false,
@@ -889,12 +888,12 @@ CombatLeft2:AddToggle('SilentAimToggle', {
 
         remotes.SilentAimTask = task.spawn(function()
             while functions.silentaimF do
-                local success, result = pcall(UrTargetFunc)
-                if success and currentTarget ~= result then
-                    currentTarget = result
+                local nextTarget = UrTargetFunc()
+                if currentTarget ~= nextTarget then
+                    currentTarget = nextTarget
                     UpdateHighlightSilent(currentTarget)
                 end
-                task.wait(0.25)
+                task.wait(0.1)
             end
         end)
 
@@ -906,9 +905,9 @@ CombatLeft2:AddToggle('SilentAimToggle', {
             if not tool or Gun ~= tool then return end
 
             local HitPart
-            local setting = SectionSettings.SilentAim.TargetPart
+            local targetPartSetting = SectionSettings.SilentAim.TargetPart
 
-            if setting == "Closest" then
+            if targetPartSetting == "Closest" then
                 local minDist = math.huge
                 for _, partName in ipairs(ValidSilentTargetParts) do
                     local part = currentTarget.Character:FindFirstChild(partName)
@@ -924,26 +923,27 @@ CombatLeft2:AddToggle('SilentAimToggle', {
                     end
                 end
             else
-                local partName = setting == "Random"
-                    and ValidSilentTargetParts[math.random(#ValidSilentTargetParts)]
-                    or setting or "Head"
+                local partName = targetPartSetting == "Random"
+                    and ValidSilentTargetParts[math.random(1, #ValidSilentTargetParts)]
+                    or targetPartSetting or "Head"
                 HitPart = currentTarget.Character:FindFirstChild(partName)
             end
 
             if not HitPart then return end
 
             local HitPos = HitPart.Position
-            local count = math.clamp(#BulletsPerShot, 1, 100)
-            local dir = CFrame.new(StartPos, HitPos).LookVector
-            local Bullets = table.create(count, dir)
+            local bulletCount = math.clamp(#BulletsPerShot, 1, 100)
+            local lookVector = CFrame.new(StartPos, HitPos).LookVector
+            local Bullets = table.create(bulletCount, lookVector)
 
-            for i = 1, count do
+            task.wait() -- буфер кадра
+
+            for i = 1, bulletCount do
                 DamageEvent:FireServer("🧈", Gun, ShotCode, i, HitPart, HitPos, Bullets[i])
             end
 
-            local hitmarker = Gun:FindFirstChild("Hitmarker")
-            if hitmarker then
-                hitmarker:Fire(HitPart)
+            if Gun:FindFirstChild("Hitmarker") then
+                Gun.Hitmarker:Fire(HitPart)
                 if HitPart.Name == "Head" then
                     PlayHeadshotSound()
                 end
