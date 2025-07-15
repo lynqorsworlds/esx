@@ -10354,6 +10354,7 @@ end)
 VendingEnabled = false
 VendingItem = "soda"
 VendingDistance = 1
+UnstuckEnabled = false
 
 MiscRight:AddToggle('VendingToggle', {
     Text = 'AutoBuyVending',
@@ -10363,32 +10364,78 @@ MiscRight:AddToggle('VendingToggle', {
     end
 })
 
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if not VendingEnabled then continue end
-        if not game:GetService("Players").LocalPlayer.Character then continue end
-        if not game:GetService("Players").LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then continue end
+MiscRight:AddToggle('UnstuckToggle', {
+    Text = 'AutoUnstuckVending',
+    Default = false,
+    Callback = function(Value)
+        UnstuckEnabled = Value
+    end
+})
 
-        ClosestMachine = nil
-        ClosestDistance = VendingDistance
+function StartUnstuckLoop()
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            if UnstuckEnabled and game:GetService("Players").LocalPlayer.Character and game:GetService("Players").LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid") and game:GetService("Players").LocalPlayer.Character:FindFirstChild("Right Leg") and game:GetService("Players").LocalPlayer.Character:FindFirstChild("Fists") and game:GetService("Players").LocalPlayer.Character:FindFirstChild("Fists") == game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Tool") then
+                ClosestStuckMachine = nil
+                ClosestStuckDistance = 15
 
-        for _, v in pairs(workspace:WaitForChild("Map"):WaitForChild("VendingMachines"):GetChildren()) do
-            if v:FindFirstChild("MainPart") and (v.MainPart.Position - game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude <= ClosestDistance then
-                ClosestDistance = (v.MainPart.Position - game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                ClosestMachine = v.MainPart
+                for _, v in pairs(workspace:WaitForChild("Map"):WaitForChild("VendingMachines"):GetChildren()) do
+                    if v:FindFirstChild("MainPart") and v:FindFirstChild("Values") and v.Values:FindFirstChild("Stuck") and v.Values.Stuck.Value then
+                        Distance = (v.MainPart.Position - game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        if Distance <= ClosestStuckDistance then
+                            ClosestStuckDistance = Distance
+                            ClosestStuckMachine = v
+                        end
+                    end
+                end
+
+                if ClosestStuckMachine then
+                    success, UnstuckValue = pcall(function()
+                        return game:GetService("ReplicatedStorage").Events["XMHH.2"]:InvokeServer("🍞", tick(), game:GetService("Players").LocalPlayer.Character.Fists, "DZDRRRKI", ClosestStuckMachine, "Vending")
+                    end)
+                    if success and UnstuckValue then
+                        for i = 1, 3 do
+                            game:GetService("ReplicatedStorage").Events["XMHH2.2"]:FireServer("🍞", tick(), game:GetService("Players").LocalPlayer.Character.Fists, "2389ZFX34", UnstuckValue, false, game:GetService("Players").LocalPlayer.Character["Right Leg"], ClosestStuckMachine.MainPart, ClosestStuckMachine, ClosestStuckMachine.MainPart.Position, ClosestStuckMachine.MainPart.Position)
+                        end
+                    end
+                end
             end
         end
+    end)
+end
 
-        if ClosestMachine then
-            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("VendinMachine"):InvokeServer(ClosestMachine, VendingItem)
-        end
+StartUnstuckLoop()
+
+game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
+    if UnstuckEnabled then
+        StartUnstuckLoop()
     end
 end)
 
-game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
-    if VendingEnabled then
+task.spawn(function()
+    while true do
         task.wait(1)
+        if VendingEnabled then
+            if game:GetService("Players").LocalPlayer.Character and game:GetService("Players").LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                ClosestMachine = nil
+                ClosestDistance = VendingDistance
+
+                for _, v in pairs(workspace:WaitForChild("Map"):WaitForChild("VendingMachines"):GetChildren()) do
+                    if v:FindFirstChild("MainPart") and v:FindFirstChild("Values") and v.Values:FindFirstChild("Stuck") and not v.Values.Stuck.Value and v.Values:FindFirstChild("Broken") and not v.Values.Broken.Value then
+                        Distance = (v.MainPart.Position - game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        if Distance <= ClosestDistance then
+                            ClosestDistance = Distance
+                            ClosestMachine = v.MainPart
+                        end
+                    end
+                end
+
+                if ClosestMachine then
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("VendinMachine"):InvokeServer(ClosestMachine, VendingItem)
+                end
+            end
+        end
     end
 end)
 
