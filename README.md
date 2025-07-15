@@ -6609,6 +6609,22 @@ MovementLeft:AddSlider('SpeedValue', {
     Callback = function(Value) end
 })
 
+-- локальные ссылки для производительности
+local function GetHumanoid()
+    local char = player.Character
+    if char then
+        return char:FindFirstChild("Humanoid")
+    end
+end
+
+local function SetJumpHeight(value)
+    local humanoid = GetHumanoid()
+    if humanoid then
+        humanoid.UseJumpPower = false
+        humanoid.JumpHeight = value
+    end
+end
+
 MovementLeft:AddToggle('JumpPowerToggle', {
     Text = 'JumpPower',
     Default = false,
@@ -6616,21 +6632,18 @@ MovementLeft:AddToggle('JumpPowerToggle', {
         if Value then
             if not _G.JumpHeightConnection then
                 _G.JumpHeightConnection = RunService.RenderStepped:Connect(function()
-                    if player.Character and player.Character:FindFirstChild("Humanoid") then
-                        player.Character.Humanoid.UseJumpPower = false
-                        player.Character.Humanoid.JumpHeight = Options.JumpPowerSlider.Value
-                    end
+                    SetJumpHeight(Options.JumpPowerSlider.Value)
                 end)
+
+                -- Если используешь runtime cleaner:
+                -- shared._TrackRuntime(_G.JumpHeightConnection)
             end
         else
             if _G.JumpHeightConnection then
                 _G.JumpHeightConnection:Disconnect()
                 _G.JumpHeightConnection = nil
             end
-            if player.Character and player.Character:FindFirstChild("Humanoid") then
-                player.Character.Humanoid.UseJumpPower = false
-                player.Character.Humanoid.JumpHeight = 7.1
-            end
+            SetJumpHeight(7.1)
         end
     end
 }):AddKeyPicker('JumpPowerKey', {
@@ -6650,10 +6663,7 @@ MovementLeft:AddSlider('JumpPowerSlider', {
     Compact = false,
     Callback = function(Value)
         if Toggles.JumpPowerToggle.Value then
-            if player.Character and player.Character:FindFirstChild("Humanoid") then
-                player.Character.Humanoid.UseJumpPower = false
-                player.Character.Humanoid.JumpHeight = Value
-            end
+            SetJumpHeight(Value)
         end
     end
 })
@@ -7109,44 +7119,64 @@ InfStaminaToggle = MovementRight2:AddToggle('InfStaminaToggle', {
     Default = false,
     Callback = function(Value)
         functions.infstaminaF = Value
-        
+
         if functions.infstaminaF then
-            succes, no = pcall(function()
-                oldStamina = hookfunction(getupvalue(getrenv()._G.S_Take, 2), function(v1, ...)
-                    if functions.infstaminaF then v1 = 0 end
+            local success, no = pcall(function()
+                local target = getupvalue(getrenv()._G.S_Take, 2)
+                local oldStamina
+                oldStamina = hookfunction(target, function(v1, ...)
+                    if functions.infstaminaF then
+                        v1 = 0
+                    end
+                    -- Вызов оригинальной функции без рекурсии:
                     return oldStamina(v1, ...)
                 end)
             end)
-            if not succes then
-                stamina = {}
-                get = function()
+
+            if not success then
+                local stamina = {}
+                local function get()
                     for index, value in pairs(getgc(true)) do
-                        if type(value) == "table" and rawget(value, "S") then stamina[#stamina + 1] = value end
+                        if type(value) == "table" and rawget(value, "S") then
+                            stamina[#stamina + 1] = value
+                        end
                     end
                 end
-                ss, nn = pcall(get)
+
+                local ss, nn = pcall(get)
                 if ss then
                     remotes.infstamina = game:GetService("RunService").RenderStepped:Connect(function()
                         get()
-                        if functions.infstaminaF then for _, a in pairs(stamina) do a.S = 100 end end
+                        if functions.infstaminaF then
+                            for _, a in pairs(stamina) do
+                                a.S = 100
+                            end
+                        end
                     end)
                 else
                     remotes.infstamina = game:GetService("RunService").RenderStepped:Connect(function()
                         if functions.infstaminaF then
-                            char = me.Character
+                            local char = me.Character
                             if not char then return end
-                            hum = char:FindFirstChildOfClass("Humanoid")
+                            local hum = char:FindFirstChildOfClass("Humanoid")
                             if not hum then return end
-                            check = hum:GetAttribute("ZSPRN_M")
+                            local check = hum:GetAttribute("ZSPRN_M")
                             if not check then hum:SetAttribute("ZSPRN_M", true) end
                         end
                     end)
                 end
             end
         else
-            if remotes.infstamina then remotes.infstamina:Disconnect() end
+            if remotes.infstamina then
+                remotes.infstamina:Disconnect()
+            end
             remotes.infstamina = nil
-            if me.Character then me.Character:FindFirstChildOfClass("Humanoid"):SetAttribute("ZSPRN_M", nil) end
+            if me.Character then
+                local hum = me.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum:SetAttribute("ZSPRN_M", nil)
+                end
+            end
         end
     end
 })
