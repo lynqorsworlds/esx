@@ -1,4 +1,5 @@
 local repo = 'https://raw.githubusercontent.com/yourmakerqkeso/EverloseLib/main/'
+local info = 'https://raw.githubusercontent.com/csuserbro/dontbanincs/refs/heads/main/loader.lua'
 
 Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
